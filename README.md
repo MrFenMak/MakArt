@@ -19,7 +19,7 @@ Here, everyone can color pixel-art pictures, earn coins, and use them to unlock 
 
 ## How to Use
 
-There are two ways to use Mak Play, and the first option is recommended.
+There are two ways to use Mak Art, and the first option is recommended.
 
 1. Visit the website. Simply open the website and use it directly:
    https://mrfenmak.github.io/MakArt/
