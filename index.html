@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mak Art</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{overscroll-behavior:none}
+:root{
+  --orange:#F97316;
+  --orange-dark:#EA580C;
+  --bg:#F4F4F5;
+  --bg2:#FFFFFF;
+  --bg3:#E4E4E7;
+  --text:#18181B;
+  --text2:#71717A;
+  --border:#D4D4D8;
+  --card:#FFFFFF;
+}
+html.dark{
+  --bg:#18181B;
+  --bg2:#27272A;
+  --bg3:#3F3F46;
+  --text:#FAFAFA;
+  --text2:#A1A1AA;
+  --border:#52525B;
+  --card:#1C1C1F;
+}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .2s,color .2s}
+input,textarea,select{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;width:100%;font-size:14px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--orange)}
+button{cursor:pointer;border:none;border-radius:8px;font-size:14px;font-weight:500;padding:10px 20px;transition:all .15s;font-family:inherit}
+.btn-orange{background:var(--orange);color:#fff}
+.btn-orange:hover{background:var(--orange-dark)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column}
+
+/* AUTH */
+#auth-screen{align-items:center;justify-content:center;padding:20px}
+.auth-box{background:var(--bg2);border-radius:16px;padding:32px;width:100%;max-width:380px;border:1px solid var(--border)}
+.auth-logo{text-align:center;margin-bottom:24px}
+.auth-logo h1{font-size:28px;font-weight:700;color:var(--orange)}
+.auth-tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--bg3);border-radius:8px;padding:4px}
+.auth-tab{flex:1;padding:8px;border-radius:6px;background:transparent;color:var(--text2);border:none;cursor:pointer;font-size:14px}
+.auth-tab.active{background:var(--orange);color:#fff}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+.err{color:#F87171;font-size:13px;margin-top:8px;text-align:center;min-height:16px}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;vertical-align:-3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOP BAR with coins */
+.top-bar-main{background:var(--orange);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.coins-display{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.18);border-radius:20px;padding:5px 12px;color:#fff;font-weight:600;font-size:13px;flex-shrink:0;white-space:nowrap}
+.coin-icon{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFE899,#F5C518 60%,#C9960B);display:inline-block;border:1px solid #A67A05;flex-shrink:0}
+.cats-scroll{flex:1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;cursor:grab;min-width:0}
+.cats-scroll::-webkit-scrollbar{display:none}
+.cats-scroll.dragging{cursor:grabbing;scroll-behavior:auto}
+.cat-btn{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.cat-btn.active{background:#fff;color:var(--orange-dark)}
+.cat-arrow{background:rgba(0,0,0,.18);border:none;color:#fff;width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.theme-toggle{background:rgba(0,0,0,.18);border:none;width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff}
+.theme-toggle svg{width:17px;height:17px}
+
+/* BOTTOM NAV */
+.bottom-nav{background:var(--orange);display:flex;height:58px;flex-shrink:0;position:sticky;bottom:0;z-index:100}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.7);background:transparent;border:none;cursor:pointer;font-size:10px}
+.nav-btn.active,.nav-btn:hover{color:#fff}
+.nav-btn svg{width:22px;height:22px}
+
+/* MAIN CONTENT */
+.main-content{flex:1;overflow-y:auto;padding:12px}
+
+/* GRID */
+.pictures-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.pic-card{background:var(--bg2);border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid var(--border);transition:transform .1s,border-color .1s}
+.pic-card:hover{transform:translateY(-2px);border-color:var(--orange)}
+.pic-thumb{width:100%;aspect-ratio:1;position:relative;background:var(--bg3);overflow:hidden}
+.pic-thumb canvas{width:100%;height:100%;image-rendering:pixelated;display:block}
+.pic-info{padding:8px}
+.pic-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pic-meta{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px;margin-top:3px}
+.coin-badge{background:rgba(249,115,22,.15);color:var(--orange-dark);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+html.dark .coin-badge{color:#FDBA74}
+.progress-bar{height:3px;background:var(--bg3);border-radius:2px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;background:var(--orange);transition:width .3s}
+.lock-overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#fff;font-size:12px}
+.lock-overlay svg{width:26px;height:26px}
+
+/* DRAWING SCREEN */
+#draw-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column}
+#draw-screen.open{display:flex}
+.draw-top{background:var(--bg2);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0;position:relative}
+.draw-title{font-weight:600;font-size:15px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.draw-canvas-wrap{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:10px;position:relative;touch-action:none}
+#draw-canvas{image-rendering:pixelated;cursor:crosshair;touch-action:none}
+.color-menu{background:var(--bg2);border-top:1px solid var(--border);padding:10px 12px;flex-shrink:0}
+.color-row{display:flex;gap:6px;align-items:center;justify-content:flex-start;flex-wrap:wrap}
+.color-item{position:relative;width:44px;height:44px;border-radius:8px;cursor:pointer;border:2px solid transparent;overflow:hidden;flex-shrink:0}
+.color-item.selected{border-color:var(--text)}
+.color-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;pointer-events:none}
+.color-progress{position:absolute;bottom:0;left:0;height:4px;background:rgba(255,255,255,.85)}
+.color-nav{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px}
+.nav-arr{background:var(--bg3);border:none;color:var(--text);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:16px}
+.zoom-hint{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .3s}
+
+/* PROFILE */
+.profile-wrap{max-width:600px;margin:0 auto;padding:16px}
+.profile-header{display:flex;gap:16px;align-items:flex-start;margin-bottom:20px}
+.profile-info{flex:1;min-width:0}
+.profile-nick{font-size:20px;font-weight:700}
+.profile-login{font-size:12px;color:var(--text2)}
+.profile-desc{font-size:14px;color:var(--text2);margin-top:6px;word-break:break-word}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}
+.stat-box{background:var(--bg2);border-radius:10px;padding:12px;text-align:center;border:1px solid var(--border)}
+.stat-num{font-size:22px;font-weight:700;color:var(--orange);display:flex;align-items:center;justify-content:center;gap:5px}
+.stat-label{font-size:11px;color:var(--text2);margin-top:2px}
+.edit-btn{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer}
+.edit-btn:hover{border-color:var(--orange)}
+.section-title{font-size:15px;font-weight:600;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.completed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+.completed-card{border-radius:10px;overflow:hidden;cursor:pointer;background:var(--bg2);border:1px solid var(--border)}
+.completed-card canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated}
+
+/* FRIENDS / SEARCH */
+.search-bar-wrap{padding:12px}
+.search-input-wrap{position:relative}
+.search-input-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);width:18px;height:18px}
+.search-input-wrap input{padding-left:36px}
+.user-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px;margin-bottom:8px;border:1px solid var(--border);cursor:pointer}
+.user-item:hover{border-color:var(--orange)}
+.u-avatar{width:40px;height:40px;border-radius:50%;background:var(--bg3);object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;flex-shrink:0;color:var(--text)}
+.u-name{font-weight:600;font-size:14px}
+.u-sub{font-size:12px;color:var(--text2)}
+.friend-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+.badge{border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(74,222,128,.15);color:#22C55E}
+.badge-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+
+/* TOP */
+.top-tabs{display:flex;gap:4px;margin-bottom:12px;background:var(--bg2);border-radius:8px;padding:4px;border:1px solid var(--border)}
+.top-tab{flex:1;padding:8px;background:transparent;border:none;color:var(--text2);border-radius:6px;cursor:pointer;font-size:13px}
+.top-tab.active{background:var(--orange);color:#fff}
+.top-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)}
+.top-rank{font-size:18px;font-weight:700;color:var(--orange);width:28px;text-align:center;flex-shrink:0}
+.top-val{font-size:14px;font-weight:700;color:var(--orange);margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-box{background:var(--bg2);border-radius:16px;padding:24px;width:100%;max-width:420px;border:1px solid var(--border);max-height:88vh;overflow-y:auto}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
+
+/* ADMIN */
+.admin-fab{position:fixed;bottom:70px;right:16px;width:48px;height:48px;border-radius:50%;background:var(--orange);border:none;color:#fff;font-size:24px;cursor:pointer;z-index:150;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(249,115,22,.4)}
+
+/* VIEW COMPLETED */
+#view-completed-screen{position:fixed;inset:0;background:var(--bg);z-index:250;display:none;flex-direction:column}
+#view-completed-screen.open{display:flex}
+
+/* LOADING OVERLAY */
+#loading-overlay{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#loading-overlay .spin{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--orange);border-radius:50%;animation:spin .8s linear infinite}
+
+/* UTILS */
+.hidden{display:none!important}
+.w100{width:100%}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:8px;font-size:13px;z-index:400;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay"><div class="spin"></div><div style="color:var(--text2);font-size:13px">Загрузка Mak Art...</div></div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" class="screen">
+  <div class="auth-box">
+    <div class="auth-logo"><h1>🎨 Mak Art</h1><p style="color:var(--text2);font-size:13px;margin-top:4px">Раскрась свой мир</p></div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Вход</button>
+      <button class="auth-tab" onclick="switchTab('register')">Регистрация</button>
+    </div>
+    <div id="login-form">
+      <div class="field"><label>Логин</label><input id="li-login" placeholder="Введите логин"></div>
+      <div class="field"><label>Пароль</label><input id="li-pass" type="password" placeholder="Введите пароль"></div>
+      <button class="btn-orange w100" id="li-btn" onclick="doLogin()">Войти</button>
+      <p id="li-err" class="err"></p>
+    </div>
+    <div id="register-form" class="hidden">
+      <div class="field"><label>Логин</label><input id="re-login" placeholder="Введите логин"></div>
+      <div class="field"><label>Пароль</label><input id="re-pass" type="password" placeholder="Введите пароль"></div>
+      <button class="btn-orange w100" id="re-btn" onclick="doRegister()">Зарегистрироваться</button>
+      <p id="re-err" class="err"></p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP SCREEN -->
+<div id="app-screen" class="screen">
+  <div class="top-bar-main">
+    <div class="coins-display"><span class="coin-icon"></span><span id="coins-count">0</span></div>
+    <button class="cat-arrow hidden" id="cat-arrow-left" onclick="scrollCats(-1)">‹</button>
+    <div class="cats-scroll" id="cats-bar"></div>
+    <button class="cat-arrow hidden" id="cat-arrow-right" onclick="scrollCats(1)">›</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()"></button>
+  </div>
+  <div id="view-home" class="main-content"></div>
+  <div id="view-search" class="main-content hidden">
+    <div class="search-bar-wrap">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="search-input" placeholder="Найти пользователя..." oninput="doSearch()">
+      </div>
+    </div>
+    <div id="search-results" class="main-content" style="padding-top:0"></div>
+  </div>
+  <div id="view-friends" class="main-content hidden">
+    <div id="friends-list"></div>
+  </div>
+  <div id="view-top" class="main-content hidden">
+    <div class="top-tabs">
+      <button class="top-tab active" onclick="switchTop('coins')">По монетам</button>
+      <button class="top-tab" onclick="switchTop('pics')">По картинам</button>
+    </div>
+    <div id="top-list"></div>
+  </div>
+  <div id="view-profile" class="main-content hidden">
+    <div class="profile-wrap" id="profile-content"></div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-home" onclick="goNav('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      Главная
+    </button>
+    <button class="nav-btn" id="nav-search" onclick="goNav('search')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Поиск
+    </button>
+    <button class="nav-btn" id="nav-friends" onclick="goNav('friends')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Друзья
+    </button>
+    <button class="nav-btn" id="nav-top" onclick="goNav('top')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
+      Топ
+    </button>
+    <button class="nav-btn" id="nav-profile" onclick="goNav('profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Профиль
+    </button>
+  </nav>
+  <button class="admin-fab hidden" id="admin-fab" onclick="openAdminAdd()">+</button>
+</div>
+
+<!-- DRAWING SCREEN -->
+<div id="draw-screen">
+  <div class="draw-top">
+    <button class="btn-ghost" style="padding:7px 12px" onclick="exitDraw()">← Назад</button>
+    <span class="draw-title" id="draw-title"></span>
+    <span id="draw-coins-badge" class="coin-badge" style="margin-left:auto"></span>
+  </div>
+  <div class="draw-canvas-wrap" id="draw-canvas-wrap">
+    <canvas id="draw-canvas"></canvas>
+    <div class="zoom-hint" id="zoom-hint">100%</div>
+  </div>
+  <div class="color-menu">
+    <div class="color-nav">
+      <button class="nav-arr" id="color-prev" onclick="colPage(-1)">◀</button>
+      <span id="color-page-info" style="font-size:12px;color:var(--text2)"></span>
+      <button class="nav-arr" id="color-next" onclick="colPage(1)">▶</button>
+    </div>
+    <div class="color-row" id="color-row"></div>
+  </div>
+</div>
+
+<!-- VIEW COMPLETED SCREEN -->
+<div id="view-completed-screen">
+  <div class="draw-top">
+    <button class="btn-ghost" style="padding:7px 12px" onclick="closeViewCompleted()">← Назад</button>
+    <span class="draw-title" id="view-completed-title"></span>
+  </div>
+  <div class="draw-canvas-wrap">
+    <canvas id="view-completed-canvas" style="image-rendering:pixelated"></canvas>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG — ВСТАВЬ СВОИ ДАННЫЕ СЮДА
+// ============================================================
+const SUPABASE_URL = 'https://shsvnlhhftspngysixst.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_r4i-GTRSKCHX-xPpFXRAvw_OKncuI7X';
+
+let sb = null;
+let DEMO_MODE = false;
+
+function initSupabase(){
+  if(SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.includes('YOUR-ANON')){
+    DEMO_MODE = true;
+    console.warn('Mak Art: Supabase не настроен. Впиши свои данные в SUPABASE_URL / SUPABASE_ANON_KEY. Сейчас приложение работает в демо-режиме на localStorage.');
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// ============================================================
+// LOCAL FALLBACK STORAGE (только для DEMO_MODE без supabase)
+// ============================================================
+const LS = {
+  get(k){try{return JSON.parse(localStorage.getItem('makart_'+k))}catch{return null}},
+  set(k,v){localStorage.setItem('makart_'+k,JSON.stringify(v))}
+};
+
+// ============================================================
+// THEME
+// ============================================================
+function applyTheme(theme){
+  document.documentElement.classList.toggle('dark',theme==='dark');
+  const btn=document.getElementById('theme-toggle');
+  btn.innerHTML = theme==='dark'
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+  localStorage.setItem('makart_theme',theme);
+}
+function toggleTheme(){
+  const cur=document.documentElement.classList.contains('dark')?'dark':'light';
+  applyTheme(cur==='dark'?'light':'dark');
+}
+applyTheme(localStorage.getItem('makart_theme')||'light');
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ============================================================
+// DATA ACCESS LAYER
+// Абстракция поверх Supabase, чтобы остальной код не зависел от backend
+// ============================================================
+const DB = {
+  async getUsers(){
+    if(DEMO_MODE)return LS.get('users')||[];
+    const {data,error}=await sb.from('users').select('*');
+    if(error){console.error(error);return[]}
+    return data.map(mapUserFromDb);
+  },
+  async getUser(login){
+    if(DEMO_MODE)return(LS.get('users')||[]).find(u=>u.login===login)||null;
+    const {data,error}=await sb.from('users').select('*').eq('login',login).maybeSingle();
+    if(error||!data)return null;
+    return mapUserFromDb(data);
+  },
+  async createUser(u){
+    if(DEMO_MODE){
+      const users=LS.get('users')||[];
+      users.push(u);LS.set('users',users);return u;
+    }
+    const {data,error}=await sb.from('users').insert({
+      login:u.login,password:u.password,nick:u.nick,desc_text:u.desc||'',
+      coins:0,total_coins:0,avatar:u.avatar||null,is_admin:u.isAdmin||false
+    }).select().single();
+    if(error)throw error;
+    return mapUserFromDb(data);
+  },
+  async updateUser(login,fields){
+    if(DEMO_MODE){
+      const users=LS.get('users')||[];
+      const i=users.findIndex(u=>u.login===login);
+      if(i>=0){users[i]={...users[i],...fields};LS.set('users',users);}
+      return;
+    }
+    const dbFields={};
+    if('nick' in fields)dbFields.nick=fields.nick;
+    if('desc' in fields)dbFields.desc_text=fields.desc;
+    if('coins' in fields)dbFields.coins=fields.coins;
+    if('totalCoins' in fields)dbFields.total_coins=fields.totalCoins;
+    if('avatar' in fields)dbFields.avatar=fields.avatar;
+    const {error}=await sb.from('users').update(dbFields).eq('login',login);
+    if(error)console.error(error);
+  },
+  async deleteUser(login){
+    if(DEMO_MODE){
+      LS.set('users',(LS.get('users')||[]).filter(u=>u.login!==login));
+      return;
+    }
+    await sb.from('users').delete().eq('login',login);
+  },
+
+  async getCategories(){
+    if(DEMO_MODE)return LS.get('categories')||['Все'];
+    const {data,error}=await sb.from('categories').select('name').order('id');
+    if(error)return['Все'];
+    return data.map(c=>c.name);
+  },
+  async addCategory(name){
+    if(DEMO_MODE){
+      const cats=LS.get('categories')||['Все'];
+      if(!cats.includes(name)){cats.push(name);LS.set('categories',cats);}
+      return;
+    }
+    await sb.from('categories').insert({name});
+  },
+  async deleteCategory(name){
+    if(DEMO_MODE){
+      LS.set('categories',(LS.get('categories')||[]).filter(c=>c!==name));
+      return;
+    }
+    await sb.from('categories').delete().eq('name',name);
+  },
+
+  async getPictures(){
+    if(DEMO_MODE)return LS.get('pictures')||[];
+    const {data,error}=await sb.from('pictures').select('*').order('id');
+    if(error){console.error(error);return[]}
+    return data.map(mapPicFromDb);
+  },
+  async createPicture(p){
+    if(DEMO_MODE){
+      const pics=LS.get('pictures')||[];
+      p.id=p.id||Date.now();
+      pics.push(p);LS.set('pictures',pics);return p;
+    }
+    const {data,error}=await sb.from('pictures').insert({
+      name:p.name,cols:p.cols,rows:p.rows,palette:p.palette,pixels:p.pixels,
+      reward:p.reward,price:p.price,category:p.category,is_draft:p.draft,created_by:p.createdBy,labels:p.labels||[]
+    }).select().single();
+    if(error)throw error;
+    return mapPicFromDb(data);
+  },
+  async updatePicture(id,fields){
+    if(DEMO_MODE){
+      const pics=LS.get('pictures')||[];
+      const i=pics.findIndex(p=>p.id===id);
+      if(i>=0){pics[i]={...pics[i],...fields};LS.set('pictures',pics);}
+      return;
+    }
+    const dbFields={};
+    if('name' in fields)dbFields.name=fields.name;
+    if('cols' in fields)dbFields.cols=fields.cols;
+    if('rows' in fields)dbFields.rows=fields.rows;
+    if('palette' in fields)dbFields.palette=fields.palette;
+    if('pixels' in fields)dbFields.pixels=fields.pixels;
+    if('reward' in fields)dbFields.reward=fields.reward;
+    if('price' in fields)dbFields.price=fields.price;
+    if('category' in fields)dbFields.category=fields.category;
+    if('draft' in fields)dbFields.is_draft=fields.draft;
+    if('labels' in fields)dbFields.labels=fields.labels;
+    const {error}=await sb.from('pictures').update(dbFields).eq('id',id);
+    if(error)console.error(error);
+  },
+  async deletePicture(id){
+    if(DEMO_MODE){LS.set('pictures',(LS.get('pictures')||[]).filter(p=>p.id!==id));return;}
+    await sb.from('pictures').delete().eq('id',id);
+  },
+
+  async getProgress(userLogin,pictureId){
+    if(DEMO_MODE){
+      const all=LS.get('progress')||[];
+      return all.find(p=>p.userLogin===userLogin&&p.pictureId===pictureId)||null;
+    }
+    const {data,error}=await sb.from('progress').select('*').eq('user_login',userLogin).eq('picture_id',pictureId).maybeSingle();
+    if(error||!data)return null;
+    return mapProgressFromDb(data);
+  },
+  async getAllProgressForUser(userLogin){
+    if(DEMO_MODE){
+      return(LS.get('progress')||[]).filter(p=>p.userLogin===userLogin);
+    }
+    const {data,error}=await sb.from('progress').select('*').eq('user_login',userLogin);
+    if(error)return[];
+    return data.map(mapProgressFromDb);
+  },
+  async createProgress(p){
+    if(DEMO_MODE){
+      const all=LS.get('progress')||[];
+      all.push(p);LS.set('progress',all);return p;
+    }
+    const {data,error}=await sb.from('progress').insert({
+      user_login:p.userLogin,picture_id:p.pictureId,pixels:p.pixels,
+      is_full:p.full,purchased:p.purchased||false
+    }).select().single();
+    if(error)throw error;
+    return mapProgressFromDb(data);
+  },
+  async updateProgress(userLogin,pictureId,fields){
+    if(DEMO_MODE){
+      const all=LS.get('progress')||[];
+      const i=all.findIndex(p=>p.userLogin===userLogin&&p.pictureId===pictureId);
+      if(i>=0){all[i]={...all[i],...fields};LS.set('progress',all);}
+      return;
+    }
+    const dbFields={};
+    if('pixels' in fields)dbFields.pixels=fields.pixels;
+    if('full' in fields)dbFields.is_full=fields.full;
+    if('purchased' in fields)dbFields.purchased=fields.purchased;
+    if('doneAt' in fields)dbFields.done_at=fields.doneAt?new Date(fields.doneAt).toISOString():null;
+    dbFields.updated_at=new Date().toISOString();
+    const {error}=await sb.from('progress').update(dbFields).eq('user_login',userLogin).eq('picture_id',pictureId);
+    if(error)console.error(error);
+  },
+
+  async getFriends(login){
+    if(DEMO_MODE){
+      const fs=LS.get('friendships')||[];
+      return fs.filter(f=>f.userLogin===login).map(f=>f.friendLogin);
+    }
+    const {data,error}=await sb.from('friendships').select('friend_login').eq('user_login',login);
+    if(error)return[];
+    return data.map(d=>d.friend_login);
+  },
+  async addFriendship(a,b){
+    if(DEMO_MODE){
+      const fs=LS.get('friendships')||[];
+      fs.push({userLogin:a,friendLogin:b});
+      fs.push({userLogin:b,friendLogin:a});
+      LS.set('friendships',fs);return;
+    }
+    await sb.from('friendships').insert([{user_login:a,friend_login:b},{user_login:b,friend_login:a}]);
+  },
+  async getFriendRequests(toLogin){
+    if(DEMO_MODE){
+      return(LS.get('requests')||[]).filter(r=>r.toLogin===toLogin).map(r=>r.fromLogin);
+    }
+    const {data,error}=await sb.from('friend_requests').select('from_login').eq('to_login',toLogin);
+    if(error)return[];
+    return data.map(d=>d.from_login);
+  },
+  async sendFriendRequest(from,to){
+    if(DEMO_MODE){
+      const reqs=LS.get('requests')||[];
+      if(reqs.find(r=>r.fromLogin===from&&r.toLogin===to))return false;
+      reqs.push({fromLogin:from,toLogin:to});LS.set('requests',reqs);return true;
+    }
+    const {error}=await sb.from('friend_requests').insert({from_login:from,to_login:to});
+    return !error;
+  },
+  async removeFriendRequest(from,to){
+    if(DEMO_MODE){
+      LS.set('requests',(LS.get('requests')||[]).filter(r=>!(r.fromLogin===from&&r.toLogin===to)));
+      return;
+    }
+    await sb.from('friend_requests').delete().eq('from_login',from).eq('to_login',to);
+  }
+};
+
+function mapUserFromDb(d){
+  return{login:d.login,password:d.password,nick:d.nick,desc:d.desc_text||'',
+    coins:d.coins||0,totalCoins:d.total_coins||0,avatar:d.avatar||null,isAdmin:!!d.is_admin};
+}
+function mapPicFromDb(d){
+  return{id:d.id,name:d.name,cols:d.cols,rows:d.rows,palette:d.palette,pixels:d.pixels,
+    reward:d.reward,price:d.price,category:d.category,draft:d.is_draft,createdBy:d.created_by,labels:d.labels||[]};
+}
+function mapProgressFromDb(d){
+  return{userLogin:d.user_login,pictureId:d.picture_id,pixels:d.pixels||{},
+    full:!!d.is_full,purchased:!!d.purchased,doneAt:d.done_at?new Date(d.done_at).getTime():null};
+}
+
+// ============================================================
+// SESSION
+// ============================================================
+function getSavedLogin(){return localStorage.getItem('makart_session')}
+function saveSession(login){localStorage.setItem('makart_session',login)}
+function clearSession(){localStorage.removeItem('makart_session')}
+
+// ============================================================
+// AUTH
+// ============================================================
+function switchTab(t){
+  document.getElementById('login-form').classList.toggle('hidden',t!=='login');
+  document.getElementById('register-form').classList.toggle('hidden',t!=='register');
+  document.querySelectorAll('.auth-tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='login')||(i===1&&t==='register')));
+}
+
+async function doLogin(){
+  const login=document.getElementById('li-login').value.trim();
+  const pass=document.getElementById('li-pass').value;
+  const errEl=document.getElementById('li-err');
+  const btn=document.getElementById('li-btn');
+  errEl.textContent='';
+  if(!login||!pass){errEl.textContent='Заполните все поля';return}
+  btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const u=await DB.getUser(login);
+    if(!u||u.password!==pass){errEl.textContent='Неверный логин или пароль';btn.textContent='Войти';return}
+    saveSession(login);
+    await enterApp(u);
+  }catch(e){console.error(e);errEl.textContent='Ошибка подключения к серверу';}
+  btn.textContent='Войти';
+}
+
+async function doRegister(){
+  const login=document.getElementById('re-login').value.trim();
+  const pass=document.getElementById('re-pass').value;
+  const err=document.getElementById('re-err');
+  const btn=document.getElementById('re-btn');
+  err.textContent='';
+  if(login.length<2){err.textContent='Логин слишком короткий';return}
+  if(pass.length<3){err.textContent='Пароль слишком короткий';return}
+  if(!/^[a-zA-Zа-яА-Я0-9_]+$/.test(login)){err.textContent='Логин: только буквы, цифры, _';return}
+  btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const existing=await DB.getUser(login);
+    if(existing){err.textContent='Логин уже занят';btn.textContent='Зарегистрироваться';return}
+    const users=await DB.getUsers();
+    if(users.find(u=>u.nick===login)){err.textContent='Этот ник уже занят';btn.textContent='Зарегистрироваться';return}
+    const nu={login,password:pass,nick:login,desc:'',coins:0,totalCoins:0,avatar:null,isAdmin:login==='M_fen'};
+    const created=await DB.createUser(nu);
+    saveSession(login);
+    await enterApp(created);
+  }catch(e){console.error(e);err.textContent='Ошибка подключения к серверу';}
+  btn.textContent='Зарегистрироваться';
+}
+
+async function enterApp(u){
+  window._cu=u;
+  document.getElementById('auth-screen').classList.remove('active');
+  document.getElementById('app-screen').classList.add('active');
+  document.getElementById('admin-fab').classList.toggle('hidden',!u.isAdmin);
+  updateCoinsDisplay();
+  await goNav('home');
+  subscribeRealtime();
+}
+
+function updateCoinsDisplay(){
+  document.getElementById('coins-count').textContent=window._cu?window._cu.coins:0;
+}
+
+async function refreshCurrentUser(){
+  const fresh=await DB.getUser(window._cu.login);
+  if(fresh){window._cu=fresh;updateCoinsDisplay();}
+  return window._cu;
+}
+
+function doLogout(){
+  showModal(`
+    <div class="modal-title">Вы выйдите из вашего аккаунта!</div>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:20px">Вы уверены?</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn-orange" style="flex:1" onclick="confirmLogout()">Да</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal()">Нет</button>
+    </div>`);
+}
+function confirmLogout(){
+  clearSession();
+  closeModal();
+  unsubscribeRealtime();
+  window._cu=null;
+  document.getElementById('app-screen').classList.remove('active');
+  document.getElementById('auth-screen').classList.add('active');
+  document.getElementById('li-login').value='';
+  document.getElementById('li-pass').value='';
+}
+
+// ============================================================
+// REALTIME
+// ============================================================
+let _channels=[];
+function subscribeRealtime(){
+  if(DEMO_MODE||!sb)return;
+  unsubscribeRealtime();
+  const ch=sb.channel('makart-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'pictures'},()=>{if(!isDrawOpen())renderHome();})
+    .on('postgres_changes',{event:'*',schema:'public',table:'categories'},()=>{renderCats();})
+    .on('postgres_changes',{event:'*',schema:'public',table:'users'},()=>{if(getActiveNav()==='top')renderTop();})
+    .subscribe();
+  _channels.push(ch);
+}
+function unsubscribeRealtime(){
+  _channels.forEach(c=>sb&&sb.removeChannel(c));
+  _channels=[];
+}
+function isDrawOpen(){return document.getElementById('draw-screen').classList.contains('open')}
+function getActiveNav(){
+  for(const t of['home','search','friends','top','profile']){
+    if(!document.getElementById('view-'+t).classList.contains('hidden'))return t;
+  }
+  return'home';
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+async function goNav(tab){
+  ['home','search','friends','top','profile'].forEach(t=>{
+    document.getElementById('view-'+t).classList.toggle('hidden',t!==tab);
+    document.getElementById('nav-'+t).classList.toggle('active',t===tab);
+  });
+  if(tab==='home')await renderHome();
+  if(tab==='friends')await renderFriends();
+  if(tab==='top')await renderTop();
+  if(tab==='profile')await viewProfile(window._cu.login);
+}
+
+// ============================================================
+// CATEGORIES BAR (scrollable, draggable)
+// ============================================================
+let _activeCat='Все';
+let _allCats=['Все'];
+
+function setupCatsDrag(){
+  const bar=document.getElementById('cats-bar');
+  let isDown=false,startX,scrollLeft;
+  bar.addEventListener('mousedown',e=>{isDown=true;bar.classList.add('dragging');startX=e.pageX;scrollLeft=bar.scrollLeft;});
+  window.addEventListener('mouseup',()=>{isDown=false;bar.classList.remove('dragging');});
+  bar.addEventListener('mousemove',e=>{
+    if(!isDown)return;e.preventDefault();
+    bar.scrollLeft=scrollLeft-(e.pageX-startX);
+  });
+  bar.addEventListener('scroll',updateCatArrows);
+}
+
+function updateCatArrows(){
+  const bar=document.getElementById('cats-bar');
+  document.getElementById('cat-arrow-left').classList.toggle('hidden',bar.scrollLeft<=4);
+  document.getElementById('cat-arrow-right').classList.toggle('hidden',bar.scrollLeft+bar.clientWidth>=bar.scrollWidth-4);
+}
+function scrollCats(dir){
+  document.getElementById('cats-bar').scrollBy({left:dir*120,behavior:'smooth'});
+}
+
+async function renderCats(){
+  _allCats=await DB.getCategories();
+  const bar=document.getElementById('cats-bar');
+  const isAdmin=window._cu&&window._cu.isAdmin;
+  bar.innerHTML='';
+  _allCats.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='cat-btn'+(c===_activeCat?' active':'');
+    b.textContent=c;
+    b.onclick=()=>{_activeCat=c;renderPictures();renderCats();};
+    bar.appendChild(b);
+  });
+  if(isAdmin){
+    const b=document.createElement('button');
+    b.className='cat-btn';b.textContent='+ Категория';
+    b.onclick=openAddCat;
+    bar.appendChild(b);
+  }
+  setTimeout(updateCatArrows,50);
+}
+
+// ============================================================
+// HOME / PICTURES
+// ============================================================
+async function renderHome(){
+  await renderCats();
+  await renderPictures();
+}
+
+async function renderPictures(){
+  const cu=await refreshCurrentUser();
+  const home=document.getElementById('view-home');
+  home.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
+
+  const [allPics,myProgress]=await Promise.all([DB.getPictures(),DB.getAllProgressForUser(cu.login)]);
+  let pics=allPics.filter(p=>!p.draft);
+  if(_activeCat!=='Все')pics=pics.filter(p=>p.category===_activeCat);
+
+  const progressMap={};
+  myProgress.forEach(p=>progressMap[p.pictureId]=p);
+
+  pics=pics.filter(p=>{
+    const pr=progressMap[p.id];
+    return!(pr&&pr.full);
+  });
+
+  if(pics.length===0){
+    home.innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--text2)">Нет доступных картин 🎉<br><span style="font-size:13px">Если вы M_fen — нажмите «+» внизу справа, чтобы нарисовать первую картину.</span></div>';
+  }else{
+    home.innerHTML='';
+    const grid=document.createElement('div');
+    grid.className='pictures-grid';
+    pics.forEach(p=>{
+      const progress=progressMap[p.id];
+      const pct=progress?calcPercent(progress.pixels,p.pixels):0;
+      const purchased=progress&&progress.purchased;
+      const locked=p.price>0&&!purchased;
+      const card=document.createElement('div');
+      card.className='pic-card';
+      card.innerHTML=`
+        <div class="pic-thumb">
+          <canvas id="thumb-${p.id}" width="${p.cols}" height="${p.rows}"></canvas>
+          ${locked?`<div class="lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span style="display:flex;align-items:center;gap:4px"><span class="coin-icon"></span>${p.price}</span></div>`:''}
+        </div>
+        <div class="pic-info">
+          <div class="pic-name">${escapeHtml(p.name)}</div>
+          <div class="pic-meta"><span class="coin-badge"><span class="coin-icon"></span>+${p.reward}</span>${p.price?`<span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px"><span class="coin-icon"></span>${p.price}</span>`:''}</div>
+          ${pct>0?`<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`:''}
+        </div>`;
+      card.onclick=()=>openPicture(p,progress);
+      grid.appendChild(card);
+      setTimeout(()=>drawThumb(p,progress,`thumb-${p.id}`),0);
+    });
+    home.appendChild(grid);
+  }
+
+  if(cu.isAdmin){
+    const drafts=allPics.filter(p=>p.draft);
+    if(drafts.length){
+      const dt=document.createElement('div');
+      dt.innerHTML='<div class="section-title">Черновики (видны только вам)</div>';
+      const dg=document.createElement('div');dg.className='pictures-grid';
+      drafts.forEach(p=>{
+        const dc=document.createElement('div');dc.className='pic-card';
+        dc.style.opacity='0.65';
+        dc.innerHTML=`<div class="pic-thumb"><canvas id="thumb-d${p.id}" width="${p.cols}" height="${p.rows}"></canvas></div><div class="pic-info"><div class="pic-name">📝 ${escapeHtml(p.name||'Без названия')}</div></div>`;
+        dc.onclick=()=>openAdminEdit(p);
+        dg.appendChild(dc);
+        setTimeout(()=>drawThumb(p,null,`thumb-d${p.id}`),0);
+      });
+      dt.appendChild(dg);
+      home.appendChild(dt);
+    }
+  }
+}
+
+function escapeHtml(s){
+  const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;
+}
+
+function calcPercent(userPixels,picPixels){
+  if(!picPixels||!userPixels)return 0;
+  let total=0;
+  picPixels.forEach(row=>row.forEach(px=>{if(px.colorIdx>=0)total++}));
+  if(!total)return 0;
+  const done=Object.keys(userPixels).length;
+  return Math.round(done/total*100);
+}
+
+function drawThumb(pic,progress,canvasId){
+  const cvs=document.getElementById(canvasId);
+  if(!cvs)return;
+  const ctx=cvs.getContext('2d');
+  const W=pic.cols,H=pic.rows;
+  cvs.width=W;cvs.height=H;
+  const img=ctx.createImageData(W,H);
+  pic.pixels.forEach((row,r)=>row.forEach((px,c)=>{
+    const i=(r*W+c)*4;
+    if(px.colorIdx<0){
+      img.data[i]=235;img.data[i+1]=235;img.data[i+2]=235;img.data[i+3]=255;
+    }else{
+      const col=pic.palette[px.colorIdx];
+      const rgb=hexToRgb(col);
+      const key=`${r},${c}`;
+      if(progress&&progress.pixels[key]!==undefined){
+        img.data[i]=rgb.r;img.data[i+1]=rgb.g;img.data[i+2]=rgb.b;img.data[i+3]=255;
+      }else{
+        const brightness=0.299*rgb.r+0.587*rgb.g+0.114*rgb.b;
+        const v=brightness<128?60:215;
+        img.data[i]=v;img.data[i+1]=v;img.data[i+2]=v;img.data[i+3]=255;
+      }
+    }
+  }));
+  ctx.putImageData(img,0,0);
+}
+
+function hexToRgb(hex){
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  return{r,g,b};
+}
+function isLight(hex){
+  const{r,g,b}=hexToRgb(hex);
+  return(0.299*r+0.587*g+0.114*b)>140;
+}
+
+// ============================================================
+// OPEN PICTURE / PURCHASE
+// ============================================================
+async function openPicture(pic,progress){
+  const cu=await refreshCurrentUser();
+  const purchased=progress&&progress.purchased;
+  if(pic.price>0&&!purchased){
+    showModal(`
+      <div class="modal-title">🔒 Платная картина</div>
+      <p style="color:var(--text2);font-size:14px;margin-bottom:8px">Потратить <b>${pic.price}</b> <span class="coin-icon" style="vertical-align:-2px"></span> монет на «${escapeHtml(pic.name)}»?</p>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px">У вас: ${cu.coins} монет</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn-orange" style="flex:1" onclick="purchaseAndOpen(${pic.id})">Да</button>
+        <button class="btn-ghost" style="flex:1" onclick="closeModal()">Нет</button>
+      </div>`);
+    return;
+  }
+  await startDraw(pic);
+}
+
+async function purchaseAndOpen(picId){
+  const cu=await refreshCurrentUser();
+  const pics=await DB.getPictures();
+  const pic=pics.find(p=>p.id===picId);
+  if(!pic)return;
+  if(cu.coins<pic.price){showToast('Недостаточно монет');closeModal();return}
+  const newCoins=cu.coins-pic.price;
+  await DB.updateUser(cu.login,{coins:newCoins});
+  cu.coins=newCoins;window._cu=cu;updateCoinsDisplay();
+
+  let progress=await DB.getProgress(cu.login,picId);
+  if(!progress){
+    progress=await DB.createProgress({userLogin:cu.login,pictureId:picId,pixels:{},full:false,purchased:true});
+  }else{
+    await DB.updateProgress(cu.login,picId,{purchased:true});
+    progress.purchased=true;
+  }
+  closeModal();
+  await startDraw(pic);
+}
+
+// ============================================================
+// DRAWING
+// ============================================================
+let _drawState={};
+
+async function startDraw(pic){
+  const cu=await refreshCurrentUser();
+  const ds=_drawState;
+  ds.pic=pic;
+  ds.selectedColorIdx=null;
+  ds.colorPage=0;
+  ds.isDrawing=false;
+  ds.zoom=1;
+
+  let progress=await DB.getProgress(cu.login,pic.id);
+  if(!progress){
+    progress=await DB.createProgress({userLogin:cu.login,pictureId:pic.id,pixels:{},full:false,purchased:pic.price===0});
+  }
+  ds.progress=progress;
+
+  document.getElementById('draw-title').textContent=pic.name;
+  document.getElementById('draw-coins-badge').innerHTML=`<span class="coin-icon"></span>+${pic.reward}`;
+
+  buildRemainingColors();
+  if(ds.remainingColors.length>0)ds.selectedColorIdx=0;
+
+  renderDrawCanvas(true);
+  renderColorMenu();
+
+  document.getElementById('draw-screen').classList.add('open');
+}
+
+function buildRemainingColors(){
+  const ds=_drawState;
+  const pic=ds.pic;
+  const progress=ds.progress;
+  const colorCount={};
+  const colorDone={};
+  pic.pixels.forEach(row=>row.forEach(px=>{
+    if(px.colorIdx<0)return;
+    colorCount[px.colorIdx]=(colorCount[px.colorIdx]||0)+1;
+  }));
+  Object.keys(colorCount).forEach(ci=>{colorDone[ci]=0});
+  Object.entries(progress.pixels).forEach(([key,ci])=>{
+    if(colorDone[ci]!==undefined)colorDone[ci]++;
+  });
+  ds.remainingColors=Object.keys(colorCount).filter(ci=>colorDone[ci]<colorCount[ci]).map(Number).sort((a,b)=>a-b);
+  ds.colorCount=colorCount;
+  ds.colorDone=colorDone;
+}
+
+function getLabel(idx,pic){
+  if(pic&&pic.labels&&pic.labels[idx]!==undefined&&pic.labels[idx]!=='')return pic.labels[idx];
+  const labels='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return labels[idx%labels.length];
+}
+
+function renderDrawCanvas(fitToScreen){
+  const ds=_drawState;
+  const pic=ds.pic;
+  const wrap=document.getElementById('draw-canvas-wrap');
+  const wrapW=wrap.clientWidth-20,wrapH=wrap.clientHeight-20;
+
+  if(fitToScreen){
+    const baseSize=Math.min(Math.floor(wrapW/pic.cols),Math.floor(wrapH/pic.rows));
+    ds.baseCellSize=Math.max(baseSize,4);
+    ds.zoom=1;
+  }
+  const cellSize=ds.baseCellSize*ds.zoom;
+
+  const cvs=document.getElementById('draw-canvas');
+  cvs.width=pic.cols*cellSize;
+  cvs.height=pic.rows*cellSize;
+  cvs.style.width=cvs.width+'px';
+  cvs.style.height=cvs.height+'px';
+  const ctx=cvs.getContext('2d');
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+
+  const emptyColor=getComputedStyle(document.documentElement).getPropertyValue('--bg3')||'#E4E4E7';
+  const showLabels=cellSize>=14;
+  pic.pixels.forEach((row,r)=>row.forEach((px,c)=>{
+    const x=c*cellSize,y=r*cellSize;
+    const key=`${r},${c}`;
+    if(px.colorIdx<0){
+      ctx.fillStyle=emptyColor;
+      ctx.fillRect(x,y,cellSize,cellSize);
+      return;
+    }
+    const done=ds.progress.pixels[key]!==undefined;
+    if(done){
+      ctx.fillStyle=pic.palette[px.colorIdx];
+      ctx.fillRect(x,y,cellSize,cellSize);
+    }else{
+      ctx.fillStyle='#E8E8E8';
+      ctx.fillRect(x,y,cellSize,cellSize);
+      ctx.strokeStyle='#CCC';ctx.lineWidth=0.5;
+      ctx.strokeRect(x+.25,y+.25,cellSize-.5,cellSize-.5);
+      if(showLabels){
+        ctx.fillStyle='#888';
+        ctx.font=`${Math.min(cellSize*.5,13)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(getLabel(px.colorIdx,pic),x+cellSize/2,y+cellSize/2);
+      }
+    }
+  }));
+  ds.cellSize=cellSize;
+  setupDrawEvents(cvs);
+}
+
+function setupDrawEvents(cvs){
+  const wrap=document.getElementById('draw-canvas-wrap');
+  cvs.onmousedown=e=>{e.preventDefault();_drawState.isDrawing=true;paintAt(e.clientX,e.clientY)};
+  window.removeEventListener('mousemove',globalMouseMove);
+  window.removeEventListener('mouseup',globalMouseUp);
+  window.addEventListener('mousemove',globalMouseMove);
+  window.addEventListener('mouseup',globalMouseUp);
+
+  cvs.ontouchstart=e=>{
+    if(e.touches.length===1){
+      e.preventDefault();_drawState.isDrawing=true;paintAt(e.touches[0].clientX,e.touches[0].clientY);
+    }else if(e.touches.length===2){
+      _drawState.isDrawing=false;
+      _drawState._pinchDist=getPinchDist(e.touches);
+      _drawState._pinchZoomStart=_drawState.zoom;
+    }
+  };
+  cvs.ontouchmove=e=>{
+    e.preventDefault();
+    if(e.touches.length===1&&_drawState.isDrawing){
+      paintAt(e.touches[0].clientX,e.touches[0].clientY);
+    }else if(e.touches.length===2){
+      const dist=getPinchDist(e.touches);
+      const ratio=dist/_drawState._pinchDist;
+      setZoom(_drawState._pinchZoomStart*ratio);
+    }
+  };
+  cvs.ontouchend=()=>{_drawState.isDrawing=false;checkCompletion();};
+
+  wrap.onwheel=e=>{
+    e.preventDefault();
+    const delta=e.deltaY<0?1.1:0.9;
+    setZoom(_drawState.zoom*delta);
+  };
+}
+
+function globalMouseMove(e){
+  if(_drawState.isDrawing&&document.getElementById('draw-screen').classList.contains('open')){
+    paintAt(e.clientX,e.clientY);
+  }
+}
+function globalMouseUp(){
+  if(_drawState.isDrawing){
+    _drawState.isDrawing=false;
+    checkCompletion();
+  }
+}
+
+function getPinchDist(touches){
+  const dx=touches[0].clientX-touches[1].clientX;
+  const dy=touches[0].clientY-touches[1].clientY;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function setZoom(z){
+  const ds=_drawState;
+  ds.zoom=Math.max(0.4,Math.min(6,z));
+  renderDrawCanvas(false);
+  const hint=document.getElementById('zoom-hint');
+  hint.textContent=Math.round(ds.zoom*100)+'%';
+  hint.style.opacity='1';
+  clearTimeout(ds._zoomHintTimer);
+  ds._zoomHintTimer=setTimeout(()=>{hint.style.opacity='0';},900);
+}
+
+function paintAt(clientX,clientY){
+  const ds=_drawState;
+  if(ds.selectedColorIdx===null||ds.selectedColorIdx===undefined)return;
+  const cvs=document.getElementById('draw-canvas');
+  const rect=cvs.getBoundingClientRect();
+  const scaleX=cvs.width/rect.width;
+  const scaleY=cvs.height/rect.height;
+  const mx=(clientX-rect.left)*scaleX;
+  const my=(clientY-rect.top)*scaleY;
+  const c=Math.floor(mx/ds.cellSize);
+  const r=Math.floor(my/ds.cellSize);
+  // Если вышли за границу рисунка — просто не красим, но isDrawing остаётся true,
+  // поэтому при возврате курсора/пальца обратно рисование продолжится без повторного зажатия
+  if(r<0||r>=ds.pic.rows||c<0||c>=ds.pic.cols)return;
+  const px=ds.pic.pixels[r][c];
+  if(px.colorIdx<0)return;
+  if(px.colorIdx!==ds.remainingColors[ds.selectedColorIdx])return;
+  const key=`${r},${c}`;
+  if(ds.progress.pixels[key]!==undefined)return;
+  ds.progress.pixels[key]=px.colorIdx;
+
+  const ci=px.colorIdx;
+  ds.colorDone[ci]=(ds.colorDone[ci]||0)+1;
+
+  const ctx=document.getElementById('draw-canvas').getContext('2d');
+  const x=c*ds.cellSize,y=r*ds.cellSize;
+  ctx.fillStyle=ds.pic.palette[ci];
+  ctx.fillRect(x,y,ds.cellSize,ds.cellSize);
+
+  schedulePixelSave();
+
+  if(ds.colorDone[ci]>=ds.colorCount[ci]){
+    const ri=ds.remainingColors.indexOf(ci);
+    if(ri>=0){
+      ds.remainingColors.splice(ri,1);
+      if(ds.selectedColorIdx>=ds.remainingColors.length)ds.selectedColorIdx=Math.max(0,ds.remainingColors.length-1);
+      ds.colorPage=0;
+      renderColorMenu();
+    }
+  }
+  updateColorProgress(ci);
+}
+
+let _saveTimer=null;
+function schedulePixelSave(){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    const ds=_drawState;
+    if(!ds.pic)return;
+    await DB.updateProgress(window._cu.login,ds.pic.id,{pixels:ds.progress.pixels});
+  },600);
+}
+async function forceSavePixels(){
+  clearTimeout(_saveTimer);
+  const ds=_drawState;
+  if(!ds.pic||!window._cu)return;
+  await DB.updateProgress(window._cu.login,ds.pic.id,{pixels:ds.progress.pixels});
+}
+
+function updateColorProgress(ci){
+  const ds=_drawState;
+  const pct=(ds.colorDone[ci]||0)/(ds.colorCount[ci]||1)*100;
+  const bar=document.getElementById('cprog-'+ci);
+  if(bar)bar.style.width=pct+'%';
+}
+
+async function checkCompletion(){
+  const ds=_drawState;
+  if(!ds.pic)return;
+  if(ds.remainingColors.length>0)return;
+  await forceSavePixels();
+  const cu=await refreshCurrentUser();
+  const already=await DB.getProgress(cu.login,ds.pic.id);
+  if(already&&already.full)return;
+
+  await DB.updateProgress(cu.login,ds.pic.id,{full:true,doneAt:Date.now()});
+  const newCoins=cu.coins+ds.pic.reward;
+  const newTotal=cu.totalCoins+ds.pic.reward;
+  await DB.updateUser(cu.login,{coins:newCoins,totalCoins:newTotal});
+  cu.coins=newCoins;cu.totalCoins=newTotal;window._cu=cu;updateCoinsDisplay();
+
+  setTimeout(()=>{
+    showModal(`<div class="modal-title">🎉 Картина завершена!</div>
+      <p style="color:var(--text2);font-size:14px;margin-bottom:16px">Вы закрасили «${escapeHtml(ds.pic.name)}» и получили <b>${ds.pic.reward}</b> <span class="coin-icon" style="vertical-align:-2px"></span> монет!</p>
+      <button class="btn-orange w100" onclick="closeModal();exitDraw()">Отлично!</button>`);
+  },250);
+}
+
+function renderColorMenu(){
+  const ds=_drawState;
+  const PER_PAGE=8;
+  const start=ds.colorPage*PER_PAGE;
+  const slice=ds.remainingColors.slice(start,start+PER_PAGE);
+  const total=Math.ceil(ds.remainingColors.length/PER_PAGE);
+
+  document.getElementById('color-page-info').textContent=total>1?`${ds.colorPage+1}/${total}`:'';
+  document.getElementById('color-prev').style.opacity=ds.colorPage===0?.3:1;
+  document.getElementById('color-next').style.opacity=ds.colorPage>=total-1?.3:1;
+
+  const row=document.getElementById('color-row');
+  row.innerHTML='';
+  slice.forEach(ci=>{
+    const globalIdx=ds.remainingColors.indexOf(ci);
+    const col=ds.pic.palette[ci];
+    const pct=(ds.colorDone[ci]||0)/(ds.colorCount[ci]||1)*100;
+    const bright=isLight(col);
+    const item=document.createElement('div');
+    item.className='color-item'+(globalIdx===ds.selectedColorIdx?' selected':'');
+    item.style.background=col;
+    item.innerHTML=`
+      <div class="color-label" style="color:${bright?'#000':'#fff'}">${getLabel(ci,ds.pic)}</div>
+      <div class="color-progress" id="cprog-${ci}" style="width:${pct}%"></div>`;
+    item.onclick=()=>{ds.selectedColorIdx=globalIdx;renderColorMenu()};
+    row.appendChild(item);
+  });
+  if(ds.remainingColors.length===0){
+    row.innerHTML='<div style="color:var(--text2);font-size:14px;text-align:center;width:100%">Все цвета закрашены!</div>';
+  }
+}
+
+function colPage(d){
+  const ds=_drawState;
+  const PER_PAGE=8;
+  const total=Math.ceil(ds.remainingColors.length/PER_PAGE);
+  ds.colorPage=Math.max(0,Math.min(total-1,ds.colorPage+d));
+  renderColorMenu();
+}
+
+async function exitDraw(){
+  await forceSavePixels();
+  window.removeEventListener('mousemove',globalMouseMove);
+  window.removeEventListener('mouseup',globalMouseUp);
+  document.getElementById('draw-screen').classList.remove('open');
+  _drawState={};
+  await renderPictures();
+}
+
+// ============================================================
+// FRIENDS
+// ============================================================
+async function renderFriends(){
+  const cu=await refreshCurrentUser();
+  const container=document.getElementById('friends-list');
+  container.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
+
+  const [friends,requests]=await Promise.all([DB.getFriends(cu.login),DB.getFriendRequests(cu.login)]);
+
+  if(!friends.length&&!requests.length){
+    container.innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--text2)">У вас пока нет друзей 😔<br>Найдите их через Поиск</div>';
+    return;
+  }
+  container.innerHTML='';
+  if(requests.length){
+    const sec=document.createElement('div');
+    sec.innerHTML='<div class="section-title" style="margin-top:0">Заявки</div>';
+    for(const login of requests){
+      const u=await DB.getUser(login);
+      if(!u)continue;
+      const item=makeUserItem(u,`
+        <button class="btn-orange" style="padding:5px 10px;font-size:12px" onclick="acceptFriend('${login}')">Принять</button>
+        <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="rejectFriend('${login}')">Отклонить</button>`);
+      sec.appendChild(item);
+    }
+    container.appendChild(sec);
+  }
+  if(friends.length){
+    const sec=document.createElement('div');
+    sec.innerHTML='<div class="section-title">Друзья</div>';
+    for(const login of friends){
+      const u=await DB.getUser(login);
+      if(!u)continue;
+      const item=makeUserItem(u,`<button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="viewProfile('${login}')">Профиль</button>`);
+      sec.appendChild(item);
+    }
+    container.appendChild(sec);
+  }
+}
+
+function makeUserItem(u,actionsHtml=''){
+  const wrap=document.createElement('div');
+  const item=document.createElement('div');
+  item.className='user-item';
+  item.innerHTML=`
+    <div class="u-avatar">${u.avatar?`<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(u.nick||u.login)[0].toUpperCase()}</div>
+    <div style="min-width:0"><div class="u-name">${escapeHtml(u.nick||u.login)}</div>${u.nick!==u.login?`<div class="u-sub">@${escapeHtml(u.login)}</div>`:''}</div>
+    <div class="friend-actions">${actionsHtml}</div>`;
+  wrap.appendChild(item);
+  return wrap;
+}
+
+async function sendFriendRequest(toLogin){
+  const cu=await refreshCurrentUser();
+  const friends=await DB.getFriends(cu.login);
+  if(friends.includes(toLogin)){showToast('Уже в друзьях');return}
+  const ok=await DB.sendFriendRequest(cu.login,toLogin);
+  if(ok)showToast('Заявка отправлена!');else showToast('Заявка уже отправлена');
+  closeModal();
+  if(getActiveNav()==='search')doSearch();
+}
+
+async function acceptFriend(login){
+  const cu=await refreshCurrentUser();
+  await DB.addFriendship(cu.login,login);
+  await DB.removeFriendRequest(login,cu.login);
+  await renderFriends();
+}
+
+async function rejectFriend(login){
+  const cu=await refreshCurrentUser();
+  await DB.removeFriendRequest(login,cu.login);
+  await renderFriends();
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+let _searchTimer=null;
+function doSearch(){
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(doSearchNow,250);
+}
+async function doSearchNow(){
+  const q=document.getElementById('search-input').value.trim().toLowerCase();
+  const res=document.getElementById('search-results');
+  if(!q){res.innerHTML='';return}
+  res.innerHTML='<div style="text-align:center;padding:20px;color:var(--text2)">Поиск...</div>';
+  const cu=window._cu;
+  const [allUsers,friends,myReqsSent]=await Promise.all([DB.getUsers(),DB.getFriends(cu.login),getSentRequestsByMe(cu.login)]);
+  const users=allUsers.filter(u=>u.login!==cu.login&&(u.login.toLowerCase().includes(q)||(u.nick||'').toLowerCase().includes(q)));
+  res.innerHTML='';
+  users.forEach(u=>{
+    const isFriend=friends.includes(u.login);
+    const sentReq=myReqsSent.includes(u.login);
+    const item=makeUserItem(u,`
+      <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="viewProfile('${u.login}')">Профиль</button>
+      ${!isFriend&&!sentReq?`<button class="btn-orange" style="padding:5px 10px;font-size:12px" onclick="sendFriendRequest('${u.login}')">+ Друг</button>`:''}
+      ${isFriend?'<span class="badge badge-green">Друг</span>':''}
+      ${sentReq&&!isFriend?'<span class="badge badge-orange">Отправлено</span>':''}
+    `);
+    res.appendChild(item);
+  });
+  if(!users.length)res.innerHTML='<div style="text-align:center;color:var(--text2);padding:20px">Не найдено</div>';
+}
+async function getSentRequestsByMe(login){
+  if(DEMO_MODE){
+    return(LS.get('requests')||[]).filter(r=>r.fromLogin===login).map(r=>r.toLogin);
+  }
+  const {data,error}=await sb.from('friend_requests').select('to_login').eq('from_login',login);
+  if(error)return[];
+  return data.map(d=>d.to_login);
+}
+
+// ============================================================
+// TOP
+// ============================================================
+let _topMode='coins';
+function switchTop(m){
+  _topMode=m;
+  document.querySelectorAll('.top-tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&m==='coins')||(i===1&&m==='pics')));
+  renderTop();
+}
+
+async function renderTop(){
+  const list=document.getElementById('top-list');
+  list.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
+  const users=await DB.getUsers();
+  let sorted;
+  if(_topMode==='coins'){
+    sorted=[...users].sort((a,b)=>(b.totalCoins||0)-(a.totalCoins||0));
+  }else{
+    const withPicsCount=await Promise.all(users.map(async u=>{
+      const prog=await DB.getAllProgressForUser(u.login);
+      return{...u,picsCount:prog.filter(p=>p.full).length};
+    }));
+    sorted=withPicsCount.sort((a,b)=>b.picsCount-a.picsCount);
+  }
+
+  list.innerHTML='';
+  const cu=window._cu;
+  sorted.slice(0,50).forEach((u,i)=>{
+    const val=_topMode==='coins'?(u.totalCoins||0):(u.picsCount||0);
+    const item=document.createElement('div');
+    item.className='top-item';
+    item.style.cursor='pointer';
+    item.innerHTML=`
+      <div class="top-rank">${i+1}</div>
+      <div class="u-avatar">${u.avatar?`<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(u.nick||u.login)[0].toUpperCase()}</div>
+      <div style="min-width:0"><div class="u-name">${escapeHtml(u.nick||u.login)}</div>${u.nick!==u.login?`<div class="u-sub">@${escapeHtml(u.login)}</div>`:''}</div>
+      <div class="top-val">${val}${_topMode==='coins'?'<span class="coin-icon"></span>':' 🖼'}</div>
+      ${cu.isAdmin?`<button class="btn-ghost" style="padding:4px 8px;font-size:11px;color:#F87171;flex-shrink:0" onclick="event.stopPropagation();removeFromTop('${u.login}')">✕</button>`:''}`;
+    item.onclick=()=>viewProfile(u.login);
+    list.appendChild(item);
+  });
+}
+
+async function removeFromTop(login){
+  if(login==='M_fen'){showToast('Нельзя удалить M_fen');return}
+  if(!confirm('Сбросить статистику '+login+'? Монеты и картины будут обнулены.'))return;
+  await DB.updateUser(login,{coins:0,totalCoins:0});
+  await renderTop();
+}
+
+// ============================================================
+// PROFILE
+// ============================================================
+async function viewProfile(login){
+  const cu=window._cu;
+  const u=login===cu.login?cu:(await DB.getUser(login))||cu;
+  const isSelf=u.login===cu.login;
+  const isAdminViewing=cu.isAdmin&&!isSelf;
+
+  ['home','search','friends','top'].forEach(t=>{document.getElementById('view-'+t).classList.add('hidden');document.getElementById('nav-'+t).classList.remove('active');});
+  document.getElementById('view-profile').classList.remove('hidden');
+  document.getElementById('nav-profile').classList.add('active');
+
+  const container=document.getElementById('profile-content');
+  container.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
+
+  const [allProgress,friends,pics]=await Promise.all([
+    DB.getAllProgressForUser(u.login),
+    DB.getFriends(u.login),
+    DB.getPictures()
+  ]);
+  const completed=allProgress.filter(c=>c.full).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
+
+  const avatarHtml=u.avatar
+    ?`<img src="${u.avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--orange)">`
+    :`<div style="width:80px;height:80px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;border:3px solid var(--orange-dark)">${(u.nick||u.login)[0].toUpperCase()}</div>`;
+
+  container.innerHTML=`
+    <div class="profile-header">
+      <div>${isSelf?`<label style="cursor:pointer" title="Сменить аватар">${avatarHtml}<input type="file" accept="image/*" style="display:none" onchange="changeAvatar(this)"></label>`:avatarHtml}</div>
+      <div class="profile-info">
+        <div class="profile-nick">${escapeHtml(u.nick||u.login)}</div>
+        ${u.nick&&u.nick!==u.login?`<div class="profile-login">@${escapeHtml(u.login)}</div>`:''}
+        <div class="profile-desc">${escapeHtml(u.desc||'')}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${isSelf?`<button class="edit-btn" onclick="editProfile()">✏️ Редактировать</button><button class="edit-btn" style="color:#F87171" onclick="doLogout()">Выйти</button>`:''}
+          ${isAdminViewing?`<button class="edit-btn" style="color:#F87171" onclick="adminDeleteUser('${u.login}')">🗑 Удалить аккаунт</button>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num"><span class="coin-icon"></span>${u.totalCoins||0}</div><div class="stat-label">Монет</div></div>
+      <div class="stat-box"><div class="stat-num">${completed.length}</div><div class="stat-label">Картин</div></div>
+      <div class="stat-box"><div class="stat-num">${friends.length}</div><div class="stat-label">Друзей</div></div>
+    </div>
+    ${!isSelf&&!isAdminViewing?`<button class="btn-orange w100" style="margin-bottom:16px" onclick="sendFriendRequest('${login}')">+ В друзья</button>`:''}
+    <div class="section-title">Закрашенные картины</div>
+    <div class="completed-grid" id="completed-grid-${login}"></div>`;
+
+  const grid=document.getElementById(`completed-grid-${login}`);
+  if(!completed.length){
+    grid.innerHTML='<div style="color:var(--text2);font-size:13px">Пока нет завершённых картин</div>';
+  }else{
+    completed.forEach(cp=>{
+      const pic=pics.find(p=>p.id===cp.pictureId);
+      if(!pic)return;
+      const card=document.createElement('div');
+      card.className='completed-card';
+      card.innerHTML=`<canvas id="cth-${cp.pictureId}-${login}" width="${pic.cols}" height="${pic.rows}"></canvas>`;
+      card.onclick=()=>viewCompleted(pic);
+      grid.appendChild(card);
+      setTimeout(()=>drawFullColorThumb(pic,`cth-${cp.pictureId}-${login}`),0);
+    });
+  }
+  if(isSelf&&completed.length){
+    const ab=document.createElement('div');
+    ab.innerHTML='<div class="section-title">Установить аватар из картины</div><div class="completed-grid" id="avatar-pick-grid"></div>';
+    container.appendChild(ab);
+    const apg=ab.querySelector('#avatar-pick-grid');
+    completed.forEach(cp=>{
+      const pic=pics.find(p=>p.id===cp.pictureId);
+      if(!pic)return;
+      const card=document.createElement('div');
+      card.className='completed-card';
+      card.style.cursor='pointer';
+      card.innerHTML=`<canvas id="apth-${cp.pictureId}" width="${pic.cols}" height="${pic.rows}"></canvas>`;
+      card.onclick=()=>setAvatarFromPic(pic);
+      apg.appendChild(card);
+      setTimeout(()=>drawFullColorThumb(pic,`apth-${cp.pictureId}`),0);
+    });
+  }
+}
+
+function drawFullColorThumb(pic,id){
+  const cvs=document.getElementById(id);
+  if(!cvs)return;
+  cvs.width=pic.cols;cvs.height=pic.rows;
+  const ctx=cvs.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  const img=ctx.createImageData(pic.cols,pic.rows);
+  pic.pixels.forEach((row,r)=>row.forEach((px,c)=>{
+    const i=(r*pic.cols+c)*4;
+    if(px.colorIdx<0){img.data[i]=235;img.data[i+1]=235;img.data[i+2]=235;img.data[i+3]=255;return;}
+    const rgb=hexToRgb(pic.palette[px.colorIdx]);
+    img.data[i]=rgb.r;img.data[i+1]=rgb.g;img.data[i+2]=rgb.b;img.data[i+3]=255;
+  }));
+  ctx.putImageData(img,0,0);
+}
+
+function viewCompleted(pic){
+  document.getElementById('view-completed-title').textContent=pic.name;
+  const cvs=document.getElementById('view-completed-canvas');
+  const wrap=cvs.parentElement;
+  const wrapW=wrap.clientWidth-20,wrapH=wrap.clientHeight-20;
+  const SIZE=Math.max(Math.min(Math.floor(wrapW/pic.cols),Math.floor(wrapH/pic.rows)),4);
+  cvs.width=pic.cols*SIZE;cvs.height=pic.rows*SIZE;
+  cvs.style.width=cvs.width+'px';cvs.style.height=cvs.height+'px';
+  const ctx=cvs.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  const off=document.createElement('canvas');
+  off.width=pic.cols;off.height=pic.rows;
+  const offCtx=off.getContext('2d');
+  const img=offCtx.createImageData(pic.cols,pic.rows);
+  pic.pixels.forEach((row,r)=>row.forEach((px,c)=>{
+    const i=(r*pic.cols+c)*4;
+    if(px.colorIdx<0){img.data[i]=240;img.data[i+1]=240;img.data[i+2]=240;img.data[i+3]=255;return;}
+    const rgb=hexToRgb(pic.palette[px.colorIdx]);
+    img.data[i]=rgb.r;img.data[i+1]=rgb.g;img.data[i+2]=rgb.b;img.data[i+3]=255;
+  }));
+  offCtx.putImageData(img,0,0);
+  ctx.drawImage(off,0,0,cvs.width,cvs.height);
+  document.getElementById('view-completed-screen').classList.add('open');
+}
+function closeViewCompleted(){
+  document.getElementById('view-completed-screen').classList.remove('open');
+}
+
+function editProfile(){
+  const cu=window._cu;
+  showModal(`
+    <div class="modal-title">Редактировать профиль</div>
+    <div class="field"><label>Ник (отображаемое имя)</label><input id="ep-nick" value="${escapeHtml(cu.nick||cu.login)}" placeholder="Ваш ник"></div>
+    <div class="field"><label>Описание</label><textarea id="ep-desc" rows="3" placeholder="Расскажите о себе">${escapeHtml(cu.desc||'')}</textarea></div>
+    <p id="ep-err" class="err"></p>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-orange" style="flex:1" onclick="saveProfile()">Сохранить</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
+    </div>`);
+}
+
+async function saveProfile(){
+  const cu=await refreshCurrentUser();
+  const newNick=document.getElementById('ep-nick').value.trim();
+  const newDesc=document.getElementById('ep-desc').value.trim();
+  const err=document.getElementById('ep-err');
+  if(!newNick){err.textContent='Ник не может быть пустым';return}
+  if(newNick!==cu.nick){
+    const users=await DB.getUsers();
+    if(users.find(u=>u.login!==cu.login&&(u.login===newNick||u.nick===newNick))){err.textContent='Этот ник уже занят';return}
+  }
+  await DB.updateUser(cu.login,{nick:newNick,desc:newDesc});
+  cu.nick=newNick;cu.desc=newDesc;window._cu=cu;
+  closeModal();
+  await viewProfile(cu.login);
+}
+
+function changeAvatar(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const img=new Image();
+    img.onload=async()=>{
+      const off=document.createElement('canvas');
+      off.width=160;off.height=160;
+      const ctx=off.getContext('2d');
+      const side=Math.min(img.width,img.height);
+      ctx.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,160,160);
+      const dataUrl=off.toDataURL('image/jpeg',0.85);
+      const cu=await refreshCurrentUser();
+      await DB.updateUser(cu.login,{avatar:dataUrl});
+      cu.avatar=dataUrl;window._cu=cu;
+      await viewProfile(cu.login);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function setAvatarFromPic(pic){
+  // Рисуем картину пиксель-в-пиксель без сглаживания, затем увеличиваем "жёстким"
+  // масштабированием (imageSmoothingEnabled=false), чтобы маленькие картинки
+  // не блюрились и аккуратно влезали в круглый аватар.
+  const off=document.createElement('canvas');
+  off.width=pic.cols;off.height=pic.rows;
+  const ctx=off.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  const img=ctx.createImageData(pic.cols,pic.rows);
+  pic.pixels.forEach((row,r)=>row.forEach((px,c)=>{
+    const i=(r*pic.cols+c)*4;
+    if(px.colorIdx<0){img.data[i]=235;img.data[i+1]=235;img.data[i+2]=235;img.data[i+3]=255;return;}
+    const rgb=hexToRgb(pic.palette[px.colorIdx]);
+    img.data[i]=rgb.r;img.data[i+1]=rgb.g;img.data[i+2]=rgb.b;img.data[i+3]=255;
+  }));
+  ctx.putImageData(img,0,0);
+  const targetSize=160;
+  const scale=Math.max(1,Math.ceil(targetSize/Math.max(pic.cols,pic.rows)));
+  const big=document.createElement('canvas');
+  big.width=pic.cols*scale;big.height=pic.rows*scale;
+  const bigCtx=big.getContext('2d');
+  bigCtx.imageSmoothingEnabled=false;
+  bigCtx.drawImage(off,0,0,big.width,big.height);
+  const cu=await refreshCurrentUser();
+  const dataUrl=big.toDataURL('image/png');
+  await DB.updateUser(cu.login,{avatar:dataUrl});
+  cu.avatar=dataUrl;window._cu=cu;
+  await viewProfile(cu.login);
+  showToast('Аватар установлен!');
+}
+
+async function adminDeleteUser(login){
+  if(login==='M_fen'){showToast('Нельзя удалить M_fen');return}
+  if(!confirm(`Удалить аккаунт «${login}» навсегда? Это действие необратимо.`))return;
+  await DB.deleteUser(login);
+  showToast('Аккаунт удалён');
+  await goNav('top');
+}
+
+// ============================================================
+// ADMIN — ADD/EDIT PICTURE
+// ============================================================
+let _adminState={};
+
+async function openAddCat(){
+  const cats=await DB.getCategories();
+  showModal(`
+    <div class="modal-title">Добавить категорию</div>
+    <div class="field"><input id="new-cat-name" placeholder="Название категории"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-orange" style="flex:1" onclick="saveNewCat()">Добавить</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
+    </div>
+    <div class="section-title" style="margin-top:16px">Существующие</div>
+    ${cats.filter(c=>c!=='Все').map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>${escapeHtml(c)}</span><button class="btn-ghost" style="padding:4px 8px;font-size:12px;color:#F87171" onclick="deleteCat('${c.replace(/'/g,"\\'")}')">Удалить</button></div>`).join('')}`);
+}
+
+async function saveNewCat(){
+  const name=document.getElementById('new-cat-name').value.trim();
+  if(!name)return;
+  const cats=await DB.getCategories();
+  if(cats.includes(name)){showToast('Уже есть');return}
+  await DB.addCategory(name);
+  closeModal();await renderCats();
+}
+
+async function deleteCat(name){
+  if(!confirm('Удалить категорию «'+name+'»?'))return;
+  await DB.deleteCategory(name);
+  closeModal();await renderCats();
+}
+
+function openAdminAdd(){
+  _adminState={id:null,cols:16,rows:16,palette:[],labels:[],pixels:null,draft:true,name:'',reward:10,price:0,category:'Все'};
+  _adminState.pixels=makeEmptyPixels(_adminState.cols,_adminState.rows);
+  openAdminEditor();
+}
+
+function openAdminEdit(pic){
+  _adminState=JSON.parse(JSON.stringify(pic));
+  if(!_adminState.labels||!_adminState.labels.length)_adminState.labels=_adminState.palette.map((_,i)=>defaultLabel(i));
+  openAdminEditor();
+}
+
+function defaultLabel(idx){
+  const labels='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return labels[idx%labels.length];
+}
+
+function makeEmptyPixels(cols,rows){
+  return Array.from({length:rows},()=>Array.from({length:cols},()=>({colorIdx:-1})));
+}
+
+function openAdminEditor(){
+  closeModal();
+  const as=_adminState;
+  const overlay=document.createElement('div');
+  overlay.id='admin-editor-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:400;display:flex;flex-direction:column;overflow-y:auto';
+
+  overlay.innerHTML=`
+    <div class="draw-top">
+      <button class="btn-ghost" style="padding:7px 12px" onclick="closeAdminEditorToDraft()">← Черновик</button>
+      <span class="draw-title" style="position:static;transform:none;max-width:none">Редактор картины</span>
+      <button class="btn-orange" style="padding:7px 14px;margin-left:auto" onclick="openAdminPublish()">Далее →</button>
+    </div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:10px;flex:1">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12px;color:var(--text2)">Размер:</label>
+        <select id="adm-cols" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;width:auto" onchange="resizeAdminCanvas()">
+          ${[8,12,16,20,24,32,40].map(n=>`<option value="${n}"${as.cols===n?' selected':''}>${n}</option>`).join('')}
+        </select>×
+        <select id="adm-rows" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;width:auto" onchange="resizeAdminCanvas()">
+          ${[8,12,16,20,24,32,40].map(n=>`<option value="${n}"${as.rows===n?' selected':''}>${n}</option>`).join('')}
+        </select>
+        <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="uploadAdminImage()">📁 Загрузить фото</button>
+        <input type="file" id="adm-file-input" accept="image/*" style="display:none" onchange="processAdminImage(this)">
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:12px;color:var(--text2)">Цвета (нажмите, чтобы выбрать кистью):</span>
+        <button class="btn-ghost" style="padding:4px 8px;font-size:12px" onclick="addAdminColor()">+ Цвет</button>
+      </div>
+      <div id="adm-palette" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start"></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text2)">Инструмент:</span>
+        <button id="adm-tool-paint" class="btn-orange" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('paint')">🖌️ Красить</button>
+        <button id="adm-tool-erase" class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('erase')">🧹 Стереть</button>
+        <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="clearAdminCanvas()">🗑️ Очистить всё</button>
+      </div>
+      <div style="overflow:auto;flex:1;display:flex;align-items:center;justify-content:center;touch-action:none" id="adm-canvas-wrap">
+        <canvas id="adm-canvas" style="image-rendering:pixelated;cursor:crosshair;touch-action:none;border:1px solid var(--border)"></canvas>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  as._tool='paint';
+  as._selectedColorIdx=as.palette.length?0:null;
+  renderAdminPalette();
+  renderAdminCanvas();
+}
+
+async function closeAdminEditorToDraft(){
+  await saveAdminDraft();
+  window.removeEventListener('mousemove',admGlobalMove);
+  window.removeEventListener('mouseup',admGlobalUp);
+  const el=document.getElementById('admin-editor-overlay');
+  if(el)el.remove();
+  await renderHome();
+}
+
+function setAdminTool(t){
+  _adminState._tool=t;
+  const pBtn=document.getElementById('adm-tool-paint');
+  const eBtn=document.getElementById('adm-tool-erase');
+  pBtn.className=t==='paint'?'btn-orange':'btn-ghost';
+  pBtn.style.padding='5px 10px';pBtn.style.fontSize='12px';
+  eBtn.className=t==='erase'?'btn-orange':'btn-ghost';
+  eBtn.style.padding='5px 10px';eBtn.style.fontSize='12px';
+}
+
+function renderAdminPalette(){
+  const pal=document.getElementById('adm-palette');
+  if(!pal)return;
+  pal.innerHTML='';
+  const as=_adminState;
+  as.palette.forEach((col,i)=>{
+    if(!as.labels)as.labels=[];
+    if(as.labels[i]===undefined)as.labels[i]=defaultLabel(i);
+    const bright=isLight(col);
+    const wrap=document.createElement('div');
+    wrap.style.cssText='position:relative;display:flex;flex-direction:column;align-items:center;gap:4px';
+    wrap.innerHTML=`
+      <div class="adm-swatch" style="width:40px;height:40px;border-radius:8px;background:${col};cursor:pointer;border:2px solid ${i===as._selectedColorIdx?'var(--text)':'transparent'};display:flex;align-items:center;justify-content:center;font-weight:700;color:${bright?'#000':'#fff'};position:relative">
+        ${escapeHtml(as.labels[i])}
+        <span class="adm-del" style="position:absolute;top:-6px;right:-6px;background:#F87171;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;color:#fff">×</span>
+      </div>
+      <input value="${escapeHtml(as.labels[i])}" maxlength="2" style="width:40px;padding:3px;text-align:center;font-size:12px">
+      <input type="color" value="${col}" style="width:40px;height:22px;padding:0;border:none;cursor:pointer">
+    `;
+    wrap.querySelector('.adm-swatch').onclick=()=>{as._selectedColorIdx=i;renderAdminPalette();};
+    wrap.querySelector('.adm-del').onclick=(e)=>{e.stopPropagation();removeAdminColor(i);};
+    wrap.querySelector('input[type=text],input:not([type])').oninput=function(){setAdminLabel(i,this.value);};
+    wrap.querySelectorAll('input')[0].oninput=function(){setAdminLabel(i,this.value);};
+    wrap.querySelectorAll('input')[1].onchange=function(){setAdminColorHex(i,this.value);};
+    pal.appendChild(wrap);
+  });
+}
+
+function setAdminLabel(i,val){
+  if(!val)return;
+  _adminState.labels[i]=val.slice(0,2);
+  renderAdminCanvas();
+}
+function setAdminColorHex(i,val){
+  _adminState.palette[i]=val;
+  renderAdminPalette();renderAdminCanvas();
+}
+
+function addAdminColor(){
+  const as=_adminState;
+  const presetColors=['#E24B4A','#378ADD','#639922','#BA7517','#534AB7','#D85A30','#1D9E75','#D4537E','#5A6ACF','#C9A227'];
+  const col=presetColors[as.palette.length%presetColors.length];
+  as.palette.push(col);
+  as.labels.push(defaultLabel(as.palette.length-1));
+  as._selectedColorIdx=as.palette.length-1;
+  renderAdminPalette();
+}
+function removeAdminColor(i){
+  const as=_adminState;
+  as.palette.splice(i,1);
+  as.labels.splice(i,1);
+  as.pixels.forEach(row=>row.forEach(px=>{if(px.colorIdx===i)px.colorIdx=-1;else if(px.colorIdx>i)px.colorIdx--;}));
+  if(as._selectedColorIdx>=as.palette.length)as._selectedColorIdx=as.palette.length-1;
+  renderAdminPalette();renderAdminCanvas();
+}
+
+function resizeAdminCanvas(){
+  _adminState.cols=parseInt(document.getElementById('adm-cols').value);
+  _adminState.rows=parseInt(document.getElementById('adm-rows').value);
+  _adminState.pixels=makeEmptyPixels(_adminState.cols,_adminState.rows);
+  renderAdminCanvas();
+}
+
+function clearAdminCanvas(){
+  _adminState.pixels=makeEmptyPixels(_adminState.cols,_adminState.rows);
+  renderAdminCanvas();
+}
+
+function renderAdminCanvas(){
+  const as=_adminState;
+  const cvs=document.getElementById('adm-canvas');
+  if(!cvs)return;
+  const wrap=document.getElementById('adm-canvas-wrap');
+  const SIZE=Math.min(Math.floor((wrap.clientWidth-20)/as.cols),Math.floor((wrap.clientHeight-20)/as.rows),28);
+  const cell=Math.max(SIZE,8);
+  cvs.width=as.cols*cell;cvs.height=as.rows*cell;
+  as._admCell=cell;
+  const ctx=cvs.getContext('2d');
+  as.pixels.forEach((row,r)=>row.forEach((px,c)=>{
+    const x=c*cell,y=r*cell;
+    if(px.colorIdx<0){ctx.fillStyle='#2A2A2E';ctx.fillRect(x,y,cell,cell);ctx.strokeStyle='#3A3A3E';ctx.lineWidth=0.5;ctx.strokeRect(x,y,cell,cell);}
+    else{ctx.fillStyle=as.palette[px.colorIdx]||'#999';ctx.fillRect(x,y,cell,cell);}
+  }));
+  cvs.onmousedown=e=>{as._adrawing=true;admPaint(e.clientX,e.clientY)};
+  window.removeEventListener('mousemove',admGlobalMove);
+  window.removeEventListener('mouseup',admGlobalUp);
+  window.addEventListener('mousemove',admGlobalMove);
+  window.addEventListener('mouseup',admGlobalUp);
+  cvs.ontouchstart=e=>{e.preventDefault();as._adrawing=true;admPaint(e.touches[0].clientX,e.touches[0].clientY)};
+  cvs.ontouchmove=e=>{e.preventDefault();if(as._adrawing)admPaint(e.touches[0].clientX,e.touches[0].clientY)};
+  cvs.ontouchend=()=>as._adrawing=false;
+}
+function admGlobalMove(e){
+  if(_adminState._adrawing&&document.getElementById('admin-editor-overlay'))admPaint(e.clientX,e.clientY);
+}
+function admGlobalUp(){_adminState._adrawing=false;}
+
+function admPaint(clientX,clientY){
+  const as=_adminState;
+  if((as._selectedColorIdx===null||as._selectedColorIdx===undefined)&&as._tool!=='erase')return;
+  const cvs=document.getElementById('adm-canvas');
+  const rect=cvs.getBoundingClientRect();
+  const scaleX=cvs.width/rect.width,scaleY=cvs.height/rect.height;
+  const mx=(clientX-rect.left)*scaleX,my=(clientY-rect.top)*scaleY;
+  const c=Math.floor(mx/as._admCell),r=Math.floor(my/as._admCell);
+  if(r<0||r>=as.rows||c<0||c>=as.cols)return;
+  const prev=as.pixels[r][c].colorIdx;
+  const newIdx=as._tool==='erase'?-1:as._selectedColorIdx;
+  if(prev===newIdx)return;
+  as.pixels[r][c].colorIdx=newIdx;
+  const ctx=cvs.getContext('2d');
+  const x=c*as._admCell,y=r*as._admCell;
+  if(newIdx<0){ctx.fillStyle='#2A2A2E';ctx.fillRect(x,y,as._admCell,as._admCell);ctx.strokeStyle='#3A3A3E';ctx.lineWidth=0.5;ctx.strokeRect(x,y,as._admCell,as._admCell);}
+  else{ctx.fillStyle=as.palette[newIdx];ctx.fillRect(x,y,as._admCell,as._admCell);}
+}
+
+function uploadAdminImage(){document.getElementById('adm-file-input').click()}
+function processAdminImage(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const as=_adminState;
+      if(!as.palette.length){showToast('Сначала добавьте хотя бы один цвет в палитру');return}
+      const off=document.createElement('canvas');
+      off.width=as.cols;off.height=as.rows;
+      const ctx=off.getContext('2d');
+      ctx.drawImage(img,0,0,as.cols,as.rows);
+      const data=ctx.getImageData(0,0,as.cols,as.rows).data;
+      as.pixels=Array.from({length:as.rows},(_,r)=>Array.from({length:as.cols},(_,c)=>{
+        const i=(r*as.cols+c)*4;
+        const [rr,gg,bb]=[data[i],data[i+1],data[i+2]];
+        const a=data[i+3];
+        if(a<128)return{colorIdx:-1};
+        let best=-1,bestD=Infinity;
+        as.palette.forEach((col,pi)=>{
+          const {r:pr,g:pg,b:pb}=hexToRgb(col);
+          const d=(rr-pr)**2+(gg-pg)**2+(bb-pb)**2;
+          if(d<bestD){bestD=d;best=pi;}
+        });
+        return{colorIdx:best};
+      }));
+      renderAdminCanvas();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveAdminDraft(){
+  const as=_adminState;
+  as.draft=true;
+  const save={name:as.name||'Черновик',cols:as.cols,rows:as.rows,palette:as.palette,pixels:as.pixels,draft:true,reward:as.reward||10,price:as.price||0,category:as.category||'Все',createdBy:window._cu.login,labels:as.labels};
+  if(as.id){await DB.updatePicture(as.id,save);}
+  else{const created=await DB.createPicture(save);as.id=created.id;}
+}
+
+async function openAdminPublish(){
+  if(!_adminState.palette.length){showToast('Добавьте хотя бы один цвет');return}
+  const cats=await DB.getCategories();
+  const as=_adminState;
+  showModal(`
+    <div class="modal-title">Настройки картины</div>
+    <div class="field"><label>Название</label><input id="ap-name" value="${escapeHtml(as.name||'')}" placeholder="Название картины"></div>
+    <div class="field"><label>Награда (монет)</label><input id="ap-reward" type="number" value="${as.reward||10}" min="0"></div>
+    <div class="field"><label>Стоимость (0 = бесплатная)</label><input id="ap-price" type="number" value="${as.price||0}" min="0"></div>
+    <div class="field"><label>Категория</label>
+      <select id="ap-cat">
+        ${cats.map(c=>`<option value="${escapeHtml(c)}"${as.category===c?' selected':''}>${escapeHtml(c)}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-orange" style="flex:1" onclick="publishAdminPic()">Опубликовать</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
+    </div>`);
+}
+
+async function publishAdminPic(){
+  const as=_adminState;
+  const name=document.getElementById('ap-name').value.trim();
+  if(!name){showToast('Введите название');return}
+  as.name=name;
+  as.reward=parseInt(document.getElementById('ap-reward').value)||0;
+  as.price=parseInt(document.getElementById('ap-price').value)||0;
+  as.category=document.getElementById('ap-cat').value;
+  as.draft=false;
+  const save={name:as.name,cols:as.cols,rows:as.rows,palette:as.palette,pixels:as.pixels,draft:false,reward:as.reward,price:as.price,category:as.category,createdBy:window._cu.login,labels:as.labels};
+  if(as.id){await DB.updatePicture(as.id,save);}
+  else{await DB.createPicture(save);}
+  closeModal();
+  window.removeEventListener('mousemove',admGlobalMove);
+  window.removeEventListener('mouseup',admGlobalUp);
+  const el=document.getElementById('admin-editor-overlay');
+  if(el)el.remove();
+  _adminState={};
+  await renderHome();
+  showToast('Картина опубликована!');
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function showModal(html){
+  document.getElementById('modal-content').innerHTML=html;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal(){
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('resize',()=>{
+  if(isDrawOpen())renderDrawCanvas(true);
+});
+
+async function init(){
+  initSupabase();
+  setupCatsDrag();
+  document.getElementById('loading-overlay').style.display='none';
+
+  const saved=getSavedLogin();
+  if(saved){
+    try{
+      const u=await DB.getUser(saved);
+      if(u){await enterApp(u);}
+      else{document.getElementById('auth-screen').classList.add('active');}
+    }catch(e){
+      console.error(e);
+      document.getElementById('auth-screen').classList.add('active');
+    }
+  }else{
+    document.getElementById('auth-screen').classList.add('active');
+  }
+
+  if(DEMO_MODE){
+    showToast('⚠ Supabase не настроен — демо-режим (localStorage)');
+  }
+}
+init();
+</script>
+</body>
+</html>
