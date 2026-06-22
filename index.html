@@ -273,7 +273,8 @@ html.dark .coin-badge{color:#FDBA74}
   <div class="draw-top">
     <button class="btn-ghost" style="padding:7px 12px" onclick="exitDraw()">← Назад</button>
     <span class="draw-title" id="draw-title"></span>
-    <span id="draw-coins-badge" class="coin-badge" style="margin-left:auto"></span>
+    <button id="draw-pan-toggle" class="btn-ghost" style="padding:7px 10px;font-size:12px;margin-left:auto" onclick="togglePanMode()">✋ Двигать</button>
+    <span id="draw-coins-badge" class="coin-badge"></span>
   </div>
   <div class="draw-canvas-wrap" id="draw-canvas-wrap">
     <canvas id="draw-canvas"></canvas>
@@ -1174,9 +1175,14 @@ async function startDraw(pic){
   ds.colorPage=0;
   ds.isDrawing=false;
   ds._isPanning=false;
+  ds.panMode=false;
   ds.zoom=1;
 
   document.getElementById('draw-canvas-wrap').classList.remove('zoomed');
+  const panBtn=document.getElementById('draw-pan-toggle');
+  if(panBtn){panBtn.className='btn-ghost';panBtn.style.padding='7px 10px';panBtn.style.fontSize='12px';}
+  const cvsEl=document.getElementById('draw-canvas');
+  if(cvsEl)cvsEl.style.cursor='crosshair';
 
   let progress=await DB.getProgress(cu.login,pic.id);
   if(!progress){
@@ -1289,6 +1295,13 @@ function setupDrawEvents(cvs){
       return;
     }
     if(e.button!==0)return;
+    if(_drawState.panMode){
+      _drawState._panStartX=e.clientX;_drawState._panStartY=e.clientY;
+      _drawState._panScrollX=wrap.scrollLeft;_drawState._panScrollY=wrap.scrollTop;
+      _drawState._isPanning=true;
+      cvs.style.cursor='grabbing';
+      return;
+    }
     _drawState.isDrawing=true;paintAt(e.clientX,e.clientY);
   };
   window.removeEventListener('mousemove',globalMouseMove);
@@ -1298,9 +1311,15 @@ function setupDrawEvents(cvs){
 
   cvs.ontouchstart=e=>{
     if(e.touches.length===1){
+      if(_drawState.panMode){
+        _drawState._panStartX=e.touches[0].clientX;_drawState._panStartY=e.touches[0].clientY;
+        _drawState._panScrollX=wrap.scrollLeft;_drawState._panScrollY=wrap.scrollTop;
+        _drawState._isPanning=true;
+        return;
+      }
       e.preventDefault();_drawState.isDrawing=true;paintAt(e.touches[0].clientX,e.touches[0].clientY);
     }else if(e.touches.length===2){
-      _drawState.isDrawing=false;
+      _drawState.isDrawing=false;_drawState._isPanning=false;
       _drawState._pinchDist=getPinchDist(e.touches);
       _drawState._pinchZoomStart=_drawState.zoom;
       _drawState._panStartX=(e.touches[0].clientX+e.touches[1].clientX)/2;
@@ -1310,6 +1329,12 @@ function setupDrawEvents(cvs){
     }
   };
   cvs.ontouchmove=e=>{
+    if(e.touches.length===1&&_drawState._isPanning){
+      e.preventDefault();
+      wrap.scrollLeft=_drawState._panScrollX-(e.touches[0].clientX-_drawState._panStartX);
+      wrap.scrollTop=_drawState._panScrollY-(e.touches[0].clientY-_drawState._panStartY);
+      return;
+    }
     if(e.touches.length===1&&_drawState.isDrawing){
       e.preventDefault();
       paintAt(e.touches[0].clientX,e.touches[0].clientY);
@@ -1333,6 +1358,22 @@ function setupDrawEvents(cvs){
   };
 }
 
+function togglePanMode(){
+  const ds=_drawState;
+  ds.panMode=!ds.panMode;
+  const btn=document.getElementById('draw-pan-toggle');
+  const cvs=document.getElementById('draw-canvas');
+  if(ds.panMode){
+    btn.className='btn-orange';
+    btn.style.padding='7px 10px';btn.style.fontSize='12px';
+    if(cvs)cvs.style.cursor='grab';
+  }else{
+    btn.className='btn-ghost';
+    btn.style.padding='7px 10px';btn.style.fontSize='12px';
+    if(cvs)cvs.style.cursor='crosshair';
+  }
+}
+
 function globalMouseMove(e){
   if(_drawState._isPanning){
     const wrap=document.getElementById('draw-canvas-wrap');
@@ -1348,7 +1389,7 @@ function globalMouseUp(){
   if(_drawState._isPanning){
     _drawState._isPanning=false;
     const cvs=document.getElementById('draw-canvas');
-    if(cvs)cvs.style.cursor='crosshair';
+    if(cvs)cvs.style.cursor=_drawState.panMode?'grab':'crosshair';
   }
   if(_drawState.isDrawing){
     _drawState.isDrawing=false;
@@ -1384,6 +1425,7 @@ function setZoom(z){
 
 function paintAt(clientX,clientY){
   const ds=_drawState;
+  if(ds.panMode)return;
   if(ds.selectedColorIdx===null||ds.selectedColorIdx===undefined)return;
   const cvs=document.getElementById('draw-canvas');
   const rect=cvs.getBoundingClientRect();
@@ -2073,7 +2115,7 @@ function openAdminEditor(){
         <button id="adm-tool-paint" class="btn-orange" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('paint')">🖌️ Красить</button>
         <button id="adm-tool-erase" class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('erase')">🧹 Стереть</button>
         <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="clearAdminCanvas()">🗑️ Очистить всё</button>
-        <span style="font-size:11px;color:var(--text2)">ПКМ — двигать холст</span>
+        <button id="adm-pan-toggle" class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="toggleAdmPanMode()">✋ Двигать</button>
       </div>
       <div class="draw-canvas-wrap" id="adm-canvas-wrap" style="flex:1;touch-action:none">
         <canvas id="adm-canvas" style="image-rendering:pixelated;cursor:crosshair;touch-action:none;border:1px solid var(--border)"></canvas>
@@ -2081,6 +2123,7 @@ function openAdminEditor(){
     </div>`;
   document.body.appendChild(overlay);
   as._tool='paint';
+  as._admPanMode=false;
   as._selectedColorIdx=as.palette.length?0:null;
   renderAdminPalette();
   renderAdminCanvas(true);
@@ -2216,6 +2259,13 @@ function setupAdminCanvasEvents(cvs,wrap){
       return;
     }
     if(e.button!==0)return;
+    if(as._admPanMode){
+      as._admPanStartX=e.clientX;as._admPanStartY=e.clientY;
+      as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
+      as._admPanning=true;
+      cvs.style.cursor='grabbing';
+      return;
+    }
     as._adrawing=true;admPaint(e.clientX,e.clientY);
   };
   window.removeEventListener('mousemove',admGlobalMove);
@@ -2225,9 +2275,15 @@ function setupAdminCanvasEvents(cvs,wrap){
 
   cvs.ontouchstart=e=>{
     if(e.touches.length===1){
+      if(as._admPanMode){
+        as._admPanStartX=e.touches[0].clientX;as._admPanStartY=e.touches[0].clientY;
+        as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
+        as._admPanning=true;
+        return;
+      }
       e.preventDefault();as._adrawing=true;admPaint(e.touches[0].clientX,e.touches[0].clientY);
     }else if(e.touches.length===2){
-      as._adrawing=false;
+      as._adrawing=false;as._admPanning=false;
       as._admPinchDist=getPinchDist(e.touches);
       as._admPinchZoomStart=as._admZoom;
       as._admPanStartX=(e.touches[0].clientX+e.touches[1].clientX)/2;
@@ -2237,6 +2293,12 @@ function setupAdminCanvasEvents(cvs,wrap){
     }
   };
   cvs.ontouchmove=e=>{
+    if(e.touches.length===1&&as._admPanning){
+      e.preventDefault();
+      wrap.scrollLeft=as._admPanScrollX-(e.touches[0].clientX-as._admPanStartX);
+      wrap.scrollTop=as._admPanScrollY-(e.touches[0].clientY-as._admPanStartY);
+      return;
+    }
     if(e.touches.length===1&&as._adrawing){
       e.preventDefault();admPaint(e.touches[0].clientX,e.touches[0].clientY);
     }else if(e.touches.length===2){
@@ -2256,6 +2318,20 @@ function setupAdminCanvasEvents(cvs,wrap){
     const delta=e.deltaY<0?1.1:0.9;
     setAdmZoom(as._admZoom*delta);
   };
+}
+
+function toggleAdmPanMode(){
+  const as=_adminState;
+  as._admPanMode=!as._admPanMode;
+  const btn=document.getElementById('adm-pan-toggle');
+  const cvs=document.getElementById('adm-canvas');
+  if(as._admPanMode){
+    btn.className='btn-orange';btn.style.padding='5px 10px';btn.style.fontSize='12px';
+    if(cvs)cvs.style.cursor='grab';
+  }else{
+    btn.className='btn-ghost';btn.style.padding='5px 10px';btn.style.fontSize='12px';
+    if(cvs)cvs.style.cursor='crosshair';
+  }
 }
 
 function setAdmZoom(z){
@@ -2285,13 +2361,14 @@ function admGlobalUp(){
   const as=_adminState;
   if(as._admPanning){
     const cvs=document.getElementById('adm-canvas');
-    if(cvs)cvs.style.cursor='crosshair';
+    if(cvs)cvs.style.cursor=as._admPanMode?'grab':'crosshair';
   }
   as._adrawing=false;as._admPanning=false;
 }
 
 function admPaint(clientX,clientY){
   const as=_adminState;
+  if(as._admPanMode)return;
   if((as._selectedColorIdx===null||as._selectedColorIdx===undefined)&&as._tool!=='erase')return;
   const cvs=document.getElementById('adm-canvas');
   const rect=cvs.getBoundingClientRect();
