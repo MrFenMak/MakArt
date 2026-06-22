@@ -273,8 +273,7 @@ html.dark .coin-badge{color:#FDBA74}
   <div class="draw-top">
     <button class="btn-ghost" style="padding:7px 12px" onclick="exitDraw()">← Назад</button>
     <span class="draw-title" id="draw-title"></span>
-    <button id="draw-pan-toggle" class="btn-ghost hidden" style="padding:7px 10px;font-size:12px;margin-left:auto" onclick="togglePanMode()">✋ Двигать</button>
-    <span id="draw-coins-badge" class="coin-badge"></span>
+    <span id="draw-coins-badge" class="coin-badge" style="margin-left:auto"></span>
   </div>
   <div class="draw-canvas-wrap" id="draw-canvas-wrap">
     <canvas id="draw-canvas"></canvas>
@@ -1174,12 +1173,10 @@ async function startDraw(pic){
   ds.selectedColorIdx=null;
   ds.colorPage=0;
   ds.isDrawing=false;
-  ds.panMode=false;
   ds._isPanning=false;
   ds.zoom=1;
 
   document.getElementById('draw-canvas-wrap').classList.remove('zoomed');
-  document.getElementById('draw-pan-toggle').classList.add('hidden');
 
   let progress=await DB.getProgress(cu.login,pic.id);
   if(!progress){
@@ -1260,12 +1257,13 @@ function renderDrawCanvas(fitToScreen){
       ctx.fillStyle=pic.palette[px.colorIdx];
       ctx.fillRect(x,y,cellSize,cellSize);
     }else{
-      ctx.fillStyle='#E8E8E8';
+      const isSelectedColor=ds.remainingColors[ds.selectedColorIdx]===px.colorIdx;
+      ctx.fillStyle=isSelectedColor?'#BFBFBF':'#E8E8E8';
       ctx.fillRect(x,y,cellSize,cellSize);
-      ctx.strokeStyle='#CCC';ctx.lineWidth=0.5;
+      ctx.strokeStyle=isSelectedColor?'#999':'#CCC';ctx.lineWidth=0.5;
       ctx.strokeRect(x+.25,y+.25,cellSize-.5,cellSize-.5);
       if(showLabels){
-        ctx.fillStyle='#888';
+        ctx.fillStyle=isSelectedColor?'#555':'#888';
         ctx.font=`${Math.min(cellSize*.5,13)}px monospace`;
         ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(getLabel(px.colorIdx,pic),x+cellSize/2,y+cellSize/2);
@@ -1279,14 +1277,18 @@ function renderDrawCanvas(fitToScreen){
 function setupDrawEvents(cvs){
   const wrap=document.getElementById('draw-canvas-wrap');
 
+  cvs.oncontextmenu=e=>e.preventDefault();
+
   cvs.onmousedown=e=>{
     e.preventDefault();
-    if(_drawState.panMode){
+    if(e.button===2){
       _drawState._panStartX=e.clientX;_drawState._panStartY=e.clientY;
       _drawState._panScrollX=wrap.scrollLeft;_drawState._panScrollY=wrap.scrollTop;
       _drawState._isPanning=true;
+      cvs.style.cursor='grabbing';
       return;
     }
+    if(e.button!==0)return;
     _drawState.isDrawing=true;paintAt(e.clientX,e.clientY);
   };
   window.removeEventListener('mousemove',globalMouseMove);
@@ -1296,28 +1298,18 @@ function setupDrawEvents(cvs){
 
   cvs.ontouchstart=e=>{
     if(e.touches.length===1){
-      if(_drawState.panMode){
-        _drawState._panStartX=e.touches[0].clientX;_drawState._panStartY=e.touches[0].clientY;
-        _drawState._panScrollX=wrap.scrollLeft;_drawState._panScrollY=wrap.scrollTop;
-        _drawState._isPanning=true;
-        return;
-      }
       e.preventDefault();_drawState.isDrawing=true;paintAt(e.touches[0].clientX,e.touches[0].clientY);
     }else if(e.touches.length===2){
-      _drawState.isDrawing=false;_drawState._isPanning=false;
+      _drawState.isDrawing=false;
       _drawState._pinchDist=getPinchDist(e.touches);
       _drawState._pinchZoomStart=_drawState.zoom;
-      _drawState._pinchMidX=(e.touches[0].clientX+e.touches[1].clientX)/2;
-      _drawState._pinchMidY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      _drawState._panStartX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      _drawState._panStartY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      _drawState._panScrollX=wrap.scrollLeft;_drawState._panScrollY=wrap.scrollTop;
+      _drawState._isPanning=true;
     }
   };
   cvs.ontouchmove=e=>{
-    if(e.touches.length===1&&_drawState._isPanning){
-      e.preventDefault();
-      wrap.scrollLeft=_drawState._panScrollX-(e.touches[0].clientX-_drawState._panStartX);
-      wrap.scrollTop=_drawState._panScrollY-(e.touches[0].clientY-_drawState._panStartY);
-      return;
-    }
     if(e.touches.length===1&&_drawState.isDrawing){
       e.preventDefault();
       paintAt(e.touches[0].clientX,e.touches[0].clientY);
@@ -1326,6 +1318,10 @@ function setupDrawEvents(cvs){
       const dist=getPinchDist(e.touches);
       const ratio=dist/_drawState._pinchDist;
       setZoom(_drawState._pinchZoomStart*ratio);
+      const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      wrap.scrollLeft=_drawState._panScrollX-(midX-_drawState._panStartX);
+      wrap.scrollTop=_drawState._panScrollY-(midY-_drawState._panStartY);
     }
   };
   cvs.ontouchend=()=>{_drawState.isDrawing=false;_drawState._isPanning=false;checkCompletion();};
@@ -1349,7 +1345,11 @@ function globalMouseMove(e){
   }
 }
 function globalMouseUp(){
-  _drawState._isPanning=false;
+  if(_drawState._isPanning){
+    _drawState._isPanning=false;
+    const cvs=document.getElementById('draw-canvas');
+    if(cvs)cvs.style.cursor='crosshair';
+  }
   if(_drawState.isDrawing){
     _drawState.isDrawing=false;
     checkCompletion();
@@ -1360,35 +1360,6 @@ function getPinchDist(touches){
   const dx=touches[0].clientX-touches[1].clientX;
   const dy=touches[0].clientY-touches[1].clientY;
   return Math.sqrt(dx*dx+dy*dy);
-}
-
-function togglePanMode(){
-  const ds=_drawState;
-  ds.panMode=!ds.panMode;
-  const btn=document.getElementById('draw-pan-toggle');
-  const cvs=document.getElementById('draw-canvas');
-  if(ds.panMode){
-    btn.className='btn-orange';
-    btn.style.padding='7px 10px';btn.style.fontSize='12px';
-    cvs.style.cursor='grab';
-  }else{
-    btn.className='btn-ghost';
-    btn.style.padding='7px 10px';btn.style.fontSize='12px';
-    cvs.style.cursor='crosshair';
-  }
-}
-
-function updatePanToggleVisibility(){
-  const ds=_drawState;
-  const btn=document.getElementById('draw-pan-toggle');
-  if(ds.zoom>1.05){
-    btn.classList.remove('hidden');
-  }else{
-    btn.classList.add('hidden');
-    ds.panMode=false;
-    const cvs=document.getElementById('draw-canvas');
-    if(cvs){cvs.style.cursor='crosshair';btn.className='btn-ghost';btn.style.padding='7px 10px';btn.style.fontSize='12px';}
-  }
 }
 
 function setZoom(z){
@@ -1404,7 +1375,6 @@ function setZoom(z){
   wrap.scrollLeft=centerX*ratio-wrap.clientWidth/2;
   wrap.scrollTop=centerY*ratio-wrap.clientHeight/2;
   wrap.classList.toggle('zoomed',ds.zoom>1.05);
-  updatePanToggleVisibility();
   const hint=document.getElementById('zoom-hint');
   hint.textContent=Math.round(ds.zoom*100)+'%';
   hint.style.opacity='1';
@@ -1414,7 +1384,6 @@ function setZoom(z){
 
 function paintAt(clientX,clientY){
   const ds=_drawState;
-  if(ds.panMode)return;
   if(ds.selectedColorIdx===null||ds.selectedColorIdx===undefined)return;
   const cvs=document.getElementById('draw-canvas');
   const rect=cvs.getBoundingClientRect();
@@ -1451,6 +1420,7 @@ function paintAt(clientX,clientY){
       if(ds.selectedColorIdx>=ds.remainingColors.length)ds.selectedColorIdx=Math.max(0,ds.remainingColors.length-1);
       ds.colorPage=0;
       renderColorMenu();
+      renderDrawCanvas(false);
     }
   }
   updateColorProgress(ci);
@@ -1525,7 +1495,7 @@ function renderColorMenu(){
     item.innerHTML=`
       <div class="color-label" style="color:${bright?'#000':'#fff'}">${getLabel(ci,ds.pic)}</div>
       <div class="color-progress" id="cprog-${ci}" style="width:${pct}%"></div>`;
-    item.onclick=()=>{ds.selectedColorIdx=globalIdx;renderColorMenu()};
+    item.onclick=()=>{ds.selectedColorIdx=globalIdx;renderColorMenu();renderDrawCanvas(false);};
     row.appendChild(item);
   });
   if(ds.remainingColors.length===0){
@@ -2103,7 +2073,7 @@ function openAdminEditor(){
         <button id="adm-tool-paint" class="btn-orange" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('paint')">🖌️ Красить</button>
         <button id="adm-tool-erase" class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('erase')">🧹 Стереть</button>
         <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="clearAdminCanvas()">🗑️ Очистить всё</button>
-        <button id="adm-pan-toggle" class="btn-ghost hidden" style="padding:5px 10px;font-size:12px" onclick="toggleAdmPanMode()">✋ Двигать</button>
+        <span style="font-size:11px;color:var(--text2)">ПКМ — двигать холст</span>
       </div>
       <div class="draw-canvas-wrap" id="adm-canvas-wrap" style="flex:1;touch-action:none">
         <canvas id="adm-canvas" style="image-rendering:pixelated;cursor:crosshair;touch-action:none;border:1px solid var(--border)"></canvas>
@@ -2231,18 +2201,21 @@ function renderAdminCanvas(fitToScreen){
   }));
   setupAdminCanvasEvents(cvs,wrap);
   wrap.classList.toggle('zoomed',as._admZoom>1.05);
-  updateAdmPanToggleVisibility();
 }
 
 function setupAdminCanvasEvents(cvs,wrap){
   const as=_adminState;
+  cvs.oncontextmenu=e=>e.preventDefault();
+
   cvs.onmousedown=e=>{
-    if(as._admPanMode){
+    if(e.button===2){
       as._admPanStartX=e.clientX;as._admPanStartY=e.clientY;
       as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
       as._admPanning=true;
+      cvs.style.cursor='grabbing';
       return;
     }
+    if(e.button!==0)return;
     as._adrawing=true;admPaint(e.clientX,e.clientY);
   };
   window.removeEventListener('mousemove',admGlobalMove);
@@ -2252,32 +2225,28 @@ function setupAdminCanvasEvents(cvs,wrap){
 
   cvs.ontouchstart=e=>{
     if(e.touches.length===1){
-      if(as._admPanMode){
-        as._admPanStartX=e.touches[0].clientX;as._admPanStartY=e.touches[0].clientY;
-        as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
-        as._admPanning=true;
-        return;
-      }
       e.preventDefault();as._adrawing=true;admPaint(e.touches[0].clientX,e.touches[0].clientY);
     }else if(e.touches.length===2){
-      as._adrawing=false;as._admPanning=false;
+      as._adrawing=false;
       as._admPinchDist=getPinchDist(e.touches);
       as._admPinchZoomStart=as._admZoom;
+      as._admPanStartX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      as._admPanStartY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
+      as._admPanning=true;
     }
   };
   cvs.ontouchmove=e=>{
-    if(e.touches.length===1&&as._admPanning){
-      e.preventDefault();
-      wrap.scrollLeft=as._admPanScrollX-(e.touches[0].clientX-as._admPanStartX);
-      wrap.scrollTop=as._admPanScrollY-(e.touches[0].clientY-as._admPanStartY);
-      return;
-    }
     if(e.touches.length===1&&as._adrawing){
       e.preventDefault();admPaint(e.touches[0].clientX,e.touches[0].clientY);
     }else if(e.touches.length===2){
       e.preventDefault();
       const dist=getPinchDist(e.touches);
       setAdmZoom(as._admPinchZoomStart*(dist/as._admPinchDist));
+      const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      wrap.scrollLeft=as._admPanScrollX-(midX-as._admPanStartX);
+      wrap.scrollTop=as._admPanScrollY-(midY-as._admPanStartY);
     }
   };
   cvs.ontouchend=()=>{as._adrawing=false;as._admPanning=false;};
@@ -2302,35 +2271,6 @@ function setAdmZoom(z){
   wrap.scrollTop=centerY*ratio-wrap.clientHeight/2;
 }
 
-function toggleAdmPanMode(){
-  const as=_adminState;
-  as._admPanMode=!as._admPanMode;
-  const btn=document.getElementById('adm-pan-toggle');
-  const cvs=document.getElementById('adm-canvas');
-  if(as._admPanMode){
-    btn.className='btn-orange';btn.style.padding='5px 10px';btn.style.fontSize='12px';
-    if(cvs)cvs.style.cursor='grab';
-  }else{
-    btn.className='btn-ghost';btn.style.padding='5px 10px';btn.style.fontSize='12px';
-    if(cvs)cvs.style.cursor='crosshair';
-  }
-}
-
-function updateAdmPanToggleVisibility(){
-  const as=_adminState;
-  const btn=document.getElementById('adm-pan-toggle');
-  if(!btn)return;
-  if(as._admZoom>1.05){
-    btn.classList.remove('hidden');
-  }else{
-    btn.classList.add('hidden');
-    as._admPanMode=false;
-    const cvs=document.getElementById('adm-canvas');
-    if(cvs)cvs.style.cursor='crosshair';
-    btn.className='btn-ghost';btn.style.padding='5px 10px';btn.style.fontSize='12px';
-  }
-}
-
 function admGlobalMove(e){
   const as=_adminState;
   if(as._admPanning&&document.getElementById('admin-editor-overlay')){
@@ -2341,11 +2281,17 @@ function admGlobalMove(e){
   }
   if(as._adrawing&&document.getElementById('admin-editor-overlay'))admPaint(e.clientX,e.clientY);
 }
-function admGlobalUp(){_adminState._adrawing=false;_adminState._admPanning=false;}
+function admGlobalUp(){
+  const as=_adminState;
+  if(as._admPanning){
+    const cvs=document.getElementById('adm-canvas');
+    if(cvs)cvs.style.cursor='crosshair';
+  }
+  as._adrawing=false;as._admPanning=false;
+}
 
 function admPaint(clientX,clientY){
   const as=_adminState;
-  if(as._admPanMode)return;
   if((as._selectedColorIdx===null||as._selectedColorIdx===undefined)&&as._tool!=='erase')return;
   const cvs=document.getElementById('adm-canvas');
   const rect=cvs.getBoundingClientRect();
