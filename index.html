@@ -93,7 +93,7 @@ html.dark .coin-badge{color:#FDBA74}
 .lock-overlay svg{width:26px;height:26px}
 .pic-edit-pencil{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
 .pic-drag-handle{position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:grab}
-.pic-delete-draft{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(248,113,113,.85);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.pic-delete-draft{position:absolute;bottom:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(248,113,113,.85);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
 
 /* DRAWING SCREEN */
 #draw-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column}
@@ -889,7 +889,7 @@ async function renderPictures(){
       drafts.forEach(p=>{
         const dc=document.createElement('div');dc.className='pic-card';
         dc.style.opacity='0.65';dc.style.position='relative';
-        dc.innerHTML=`<div class="pic-thumb"><canvas id="thumb-d${p.id}" width="${p.cols}" height="${p.rows}"></canvas></div><div class="pic-info"><div class="pic-name">📝 ${escapeHtml(p.name||'Без названия')}</div></div><button class="pic-delete-draft" onclick="event.stopPropagation();deleteDraft(${p.id})" title="Удалить черновик">🗑</button>`;
+        dc.innerHTML=`<div class="pic-thumb"><canvas id="thumb-d${p.id}" width="${p.cols}" height="${p.rows}"></canvas><button class="pic-delete-draft" onclick="event.stopPropagation();deleteDraft(${p.id})" title="Удалить черновик">🗑</button></div><div class="pic-info"><div class="pic-name">📝 ${escapeHtml(p.name||'Без названия')}</div></div>`;
         dc.onclick=()=>openAdminEdit(p);
         dg.appendChild(dc);
         setTimeout(()=>drawThumb(p,null,`thumb-d${p.id}`),0);
