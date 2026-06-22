@@ -91,6 +91,9 @@ html.dark .coin-badge{color:#FDBA74}
 .progress-fill{height:100%;background:var(--orange);transition:width .3s}
 .lock-overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#fff;font-size:12px}
 .lock-overlay svg{width:26px;height:26px}
+.pic-edit-pencil{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.pic-drag-handle{position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:grab}
+.pic-delete-draft{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(248,113,113,.85);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
 
 /* DRAWING SCREEN */
 #draw-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column}
@@ -152,7 +155,7 @@ html.dark .coin-badge{color:#FDBA74}
 .top-val{font-size:14px;font-weight:700;color:var(--orange);margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal-box{background:var(--bg2);border-radius:16px;padding:24px;width:100%;max-width:420px;border:1px solid var(--border);max-height:88vh;overflow-y:auto}
 .modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
 
@@ -208,7 +211,14 @@ html.dark .coin-badge{color:#FDBA74}
     <button class="cat-arrow hidden" id="cat-arrow-left" onclick="scrollCats(-1)">‹</button>
     <div class="cats-scroll" id="cats-bar"></div>
     <button class="cat-arrow hidden" id="cat-arrow-right" onclick="scrollCats(1)">›</button>
+    <button class="theme-toggle hidden" id="admin-manage-btn" onclick="openAdminManageAll()" title="Управление всеми картинами" style="border-radius:6px">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()"></button>
+  </div>
+  <div id="ptr-indicator" style="display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;transition:height .15s;flex-shrink:0;color:var(--text2);font-size:12px;gap:6px">
+    <div id="ptr-spinner" style="width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--orange);border-radius:50%"></div>
+    <span id="ptr-label">Потяните, чтобы обновить</span>
   </div>
   <div id="view-home" class="main-content"></div>
   <div id="view-search" class="main-content hidden">
@@ -335,8 +345,8 @@ function applyTheme(theme){
   document.documentElement.classList.toggle('dark',theme==='dark');
   const btn=document.getElementById('theme-toggle');
   btn.innerHTML = theme==='dark'
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
-    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+    ? `<svg viewBox="0 0 24 24" width="17" height="17"><path fill="#fff" d="M12 2.5a9.5 9.5 0 1 0 9.46 10.55.75.75 0 0 0-.9-.83 7.6 7.6 0 0 1-9.18-9.18.75.75 0 0 0-.83-.9c-.07.01-.13.02-.55.06A9.5 9.5 0 0 0 12 2.5z"/><circle cx="8.7" cy="9" r="1" fill="#fff" opacity="0.45"/><circle cx="11.3" cy="13.2" r="1.3" fill="#fff" opacity="0.45"/><circle cx="7.6" cy="14" r="0.8" fill="#fff" opacity="0.45"/></svg>`
+    : `<svg viewBox="0 0 24 24" width="17" height="17"><circle cx="12" cy="12" r="5" fill="#fff"/><g stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></g></svg>`;
   localStorage.setItem('makart_theme',theme);
 }
 function toggleTheme(){
@@ -438,11 +448,13 @@ const DB = {
     if(DEMO_MODE){
       const pics=LS.get('pictures')||[];
       p.id=p.id||Date.now();
+      if(p.sortOrder===undefined)p.sortOrder=pics.length;
       pics.push(p);LS.set('pictures',pics);return p;
     }
     const {data,error}=await sb.from('pictures').insert({
       name:p.name,cols:p.cols,rows:p.rows,palette:p.palette,pixels:p.pixels,
-      reward:p.reward,price:p.price,category:p.category,is_draft:p.draft,created_by:p.createdBy,labels:p.labels||[]
+      reward:p.reward,price:p.price,categories:p.categories||['Все'],is_draft:p.draft,created_by:p.createdBy,labels:p.labels||[],
+      sort_order:p.sortOrder||0
     }).select().single();
     if(error)throw error;
     return mapPicFromDb(data);
@@ -462,15 +474,17 @@ const DB = {
     if('pixels' in fields)dbFields.pixels=fields.pixels;
     if('reward' in fields)dbFields.reward=fields.reward;
     if('price' in fields)dbFields.price=fields.price;
-    if('category' in fields)dbFields.category=fields.category;
+    if('categories' in fields)dbFields.categories=fields.categories;
     if('draft' in fields)dbFields.is_draft=fields.draft;
     if('labels' in fields)dbFields.labels=fields.labels;
+    if('sortOrder' in fields)dbFields.sort_order=fields.sortOrder;
     const {error}=await sb.from('pictures').update(dbFields).eq('id',id);
     if(error){console.error(error);throw error;}
   },
   async deletePicture(id){
     if(DEMO_MODE){LS.set('pictures',(LS.get('pictures')||[]).filter(p=>p.id!==id));return;}
-    await sb.from('pictures').delete().eq('id',id);
+    const {error}=await sb.from('pictures').delete().eq('id',id);
+    if(error){console.error(error);throw error;}
   },
 
   async getProgress(userLogin,pictureId){
@@ -569,7 +583,8 @@ function mapUserFromDb(d){
 }
 function mapPicFromDb(d){
   return{id:d.id,name:d.name,cols:d.cols,rows:d.rows,palette:d.palette,pixels:d.pixels,
-    reward:d.reward,price:d.price,category:d.category,draft:d.is_draft,createdBy:d.created_by,labels:d.labels||[]};
+    reward:d.reward,price:d.price,categories:(d.categories&&d.categories.length?d.categories:(d.category?[d.category]:['Все'])),
+    draft:d.is_draft,createdBy:d.created_by,labels:d.labels||[],sortOrder:d.sort_order||0};
 }
 function mapProgressFromDb(d){
   return{userLogin:d.user_login,pictureId:d.picture_id,pixels:d.pixels||{},
@@ -637,6 +652,7 @@ async function enterApp(u){
   document.getElementById('auth-screen').classList.remove('active');
   document.getElementById('app-screen').classList.add('active');
   document.getElementById('admin-fab').classList.toggle('hidden',!u.isAdmin);
+  document.getElementById('admin-manage-btn').classList.toggle('hidden',!u.isAdmin);
   updateCoinsDisplay();
   await goNav('home');
   subscribeRealtime();
@@ -763,6 +779,41 @@ async function renderCats(){
 // ============================================================
 // HOME / PICTURES
 // ============================================================
+let _sortMode='newest';
+const SORT_LABELS={
+  newest:'Сначала новые',
+  oldest:'Сначала старые',
+  freeFirst:'Сначала бесплатные',
+  paidFirst:'Сначала платные',
+  smallFirst:'Сначала маленькие',
+  bigFirst:'Сначала большие'
+};
+
+function sortPictures(pics){
+  const arr=[...pics];
+  switch(_sortMode){
+    case 'newest': return arr.sort((a,b)=>b.id-a.id);
+    case 'oldest': return arr.sort((a,b)=>a.id-b.id);
+    case 'freeFirst': return arr.sort((a,b)=>(a.price>0?1:0)-(b.price>0?1:0));
+    case 'paidFirst': return arr.sort((a,b)=>(b.price>0?1:0)-(a.price>0?1:0));
+    case 'smallFirst': return arr.sort((a,b)=>(a.cols*a.rows)-(b.cols*b.rows));
+    case 'bigFirst': return arr.sort((a,b)=>(b.cols*b.rows)-(a.cols*a.rows));
+    default: return arr;
+  }
+}
+
+function openSortMenu(){
+  const items=Object.entries(SORT_LABELS).map(([key,label])=>
+    `<button class="btn-ghost w100" style="text-align:left;margin-bottom:6px;${key===_sortMode?'border-color:var(--orange);color:var(--orange)':''}" onclick="setSortMode('${key}')">${label}${key===_sortMode?' ✓':''}</button>`
+  ).join('');
+  showModal(`<div class="modal-title">Сортировка картин</div>${items}`);
+}
+function setSortMode(mode){
+  _sortMode=mode;
+  closeModal();
+  renderPictures();
+}
+
 async function renderHome(){
   await renderCats();
   await renderPictures();
@@ -775,7 +826,7 @@ async function renderPictures(){
 
   const [allPics,myProgress]=await Promise.all([DB.getPictures(),DB.getAllProgressForUser(cu.login)]);
   let pics=allPics.filter(p=>!p.draft);
-  if(_activeCat!=='Все')pics=pics.filter(p=>p.category===_activeCat);
+  if(_activeCat!=='Все')pics=pics.filter(p=>(p.categories||['Все']).includes(_activeCat));
 
   const progressMap={};
   myProgress.forEach(p=>progressMap[p.pictureId]=p);
@@ -785,10 +836,21 @@ async function renderPictures(){
     return!(pr&&pr.full);
   });
 
+  pics=sortPictures(pics);
+
+  home.innerHTML='';
+
+  const header=document.createElement('div');
+  header.style.cssText='display:flex;justify-content:flex-end;margin-bottom:8px';
+  header.innerHTML=`<button class="btn-ghost" style="padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:5px" onclick="openSortMenu()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h10M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-3 3M17 5l3 3M17 19l-3-3M17 19l3-3"/></svg>${SORT_LABELS[_sortMode]}</button>`;
+  home.appendChild(header);
+
   if(pics.length===0){
-    home.innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--text2)">Нет доступных картин 🎉<br><span style="font-size:13px">Если вы M_fen — нажмите «+» внизу справа, чтобы нарисовать первую картину.</span></div>';
+    const empty=document.createElement('div');
+    empty.style.cssText='text-align:center;padding:60px 20px;color:var(--text2)';
+    empty.innerHTML='Нет доступных картин 🎉';
+    home.appendChild(empty);
   }else{
-    home.innerHTML='';
     const grid=document.createElement('div');
     grid.className='pictures-grid';
     pics.forEach(p=>{
@@ -802,17 +864,21 @@ async function renderPictures(){
         <div class="pic-thumb">
           <canvas id="thumb-${p.id}" width="${p.cols}" height="${p.rows}"></canvas>
           ${locked?`<div class="lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span style="display:flex;align-items:center;gap:4px"><span class="coin-icon"></span>${p.price}</span></div>`:''}
+          ${cu.isAdmin?`<button class="pic-edit-pencil" onclick="event.stopPropagation();openAdminQuickEdit(${p.id})" title="Изменить">✏️</button>`:''}
+          ${cu.isAdmin?`<div class="pic-drag-handle" draggable="true" title="Перетащить">⠿</div>`:''}
         </div>
         <div class="pic-info">
           <div class="pic-name">${escapeHtml(p.name)}</div>
           <div class="pic-meta"><span class="coin-badge"><span class="coin-icon"></span>+${p.reward}</span>${p.price?`<span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px"><span class="coin-icon"></span>${p.price}</span>`:''}</div>
           ${pct>0?`<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`:''}
         </div>`;
+      card.dataset.picId=p.id;
       card.onclick=()=>openPicture(p,progress);
       grid.appendChild(card);
       setTimeout(()=>drawThumb(p,progress,`thumb-${p.id}`),0);
     });
     home.appendChild(grid);
+    if(cu.isAdmin)setupDragReorder(grid,pics,renderHome);
   }
 
   if(cu.isAdmin){
@@ -823,8 +889,8 @@ async function renderPictures(){
       const dg=document.createElement('div');dg.className='pictures-grid';
       drafts.forEach(p=>{
         const dc=document.createElement('div');dc.className='pic-card';
-        dc.style.opacity='0.65';
-        dc.innerHTML=`<div class="pic-thumb"><canvas id="thumb-d${p.id}" width="${p.cols}" height="${p.rows}"></canvas></div><div class="pic-info"><div class="pic-name">📝 ${escapeHtml(p.name||'Без названия')}</div></div>`;
+        dc.style.opacity='0.65';dc.style.position='relative';
+        dc.innerHTML=`<div class="pic-thumb"><canvas id="thumb-d${p.id}" width="${p.cols}" height="${p.rows}"></canvas></div><div class="pic-info"><div class="pic-name">📝 ${escapeHtml(p.name||'Без названия')}</div></div><button class="pic-delete-draft" onclick="event.stopPropagation();deleteDraft(${p.id})" title="Удалить черновик">🗑</button>`;
         dc.onclick=()=>openAdminEdit(p);
         dg.appendChild(dc);
         setTimeout(()=>drawThumb(p,null,`thumb-d${p.id}`),0);
@@ -833,6 +899,175 @@ async function renderPictures(){
       home.appendChild(dt);
     }
   }
+}
+
+async function deleteDraft(id){
+  if(!confirm('Удалить этот черновик навсегда?'))return;
+  await DB.deletePicture(id);
+  showToast('Черновик удалён');
+  await renderHome();
+}
+
+// ============================================================
+// ADMIN — MANAGE ALL PICTURES (включая закрашенные M_fen)
+// ============================================================
+async function openAdminManageAll(){
+  const cu=window._cu;
+  if(!cu||!cu.isAdmin)return;
+  const overlay=document.createElement('div');
+  overlay.id='admin-manage-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:400;display:flex;flex-direction:column;overflow:hidden';
+  overlay.innerHTML=`
+    <div class="draw-top">
+      <button class="btn-ghost" style="padding:7px 12px" onclick="closeAdminManageAll()">← Назад</button>
+      <span class="draw-title" style="position:static;transform:none;max-width:none">Все картины</span>
+      <span style="margin-left:auto;font-size:12px;color:var(--text2)">Тащите ⠿, чтобы изменить порядок</span>
+    </div>
+    <div class="main-content" id="admin-manage-content" style="flex:1;overflow-y:auto"></div>`;
+  document.body.appendChild(overlay);
+  await renderAdminManageList();
+}
+
+function closeAdminManageAll(){
+  const el=document.getElementById('admin-manage-overlay');
+  if(el)el.remove();
+}
+
+async function renderAdminManageList(){
+  const container=document.getElementById('admin-manage-content');
+  if(!container)return;
+  container.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
+
+  const cu=window._cu;
+  const [allPics,myProgress]=await Promise.all([DB.getPictures(),DB.getAllProgressForUser(cu.login)]);
+  const progressMap={};
+  myProgress.forEach(p=>progressMap[p.pictureId]=p);
+
+  const pics=allPics.filter(p=>!p.draft).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+
+  if(!pics.length){
+    container.innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--text2)">Нет опубликованных картин</div>';
+    return;
+  }
+
+  container.innerHTML='';
+  const grid=document.createElement('div');
+  grid.className='pictures-grid';
+  pics.forEach(p=>{
+    const progress=progressMap[p.id];
+    const isMineFull=progress&&progress.full;
+    const card=document.createElement('div');
+    card.className='pic-card';
+    card.style.cursor='default';
+    card.style.position='relative';
+    card.innerHTML=`
+      <div class="pic-thumb">
+        <canvas id="manage-thumb-${p.id}" width="${p.cols}" height="${p.rows}"></canvas>
+        ${isMineFull?'<div style="position:absolute;bottom:4px;left:4px;background:rgba(34,197,94,.85);color:#fff;font-size:10px;padding:2px 6px;border-radius:6px">✓ закрашено вами</div>':''}
+        <button class="pic-edit-pencil" onclick="event.stopPropagation();openAdminQuickEdit(${p.id})" title="Изменить">✏️</button>
+        <div class="pic-drag-handle" draggable="true" title="Перетащить">⠿</div>
+        <button class="pic-delete-draft" onclick="event.stopPropagation();deleteManagedPicture(${p.id})" title="Удалить">🗑</button>
+      </div>
+      <div class="pic-info">
+        <div class="pic-name">${escapeHtml(p.name)}</div>
+        <div class="pic-meta"><span class="coin-badge"><span class="coin-icon"></span>+${p.reward}</span>${p.price?`<span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px"><span class="coin-icon"></span>${p.price}</span>`:''}</div>
+      </div>`;
+    card.dataset.picId=p.id;
+    grid.appendChild(card);
+    setTimeout(()=>drawFullColorThumb(p,`manage-thumb-${p.id}`),0);
+  });
+  container.appendChild(grid);
+  setupDragReorder(grid,pics,renderAdminManageList);
+}
+
+async function deleteManagedPicture(id){
+  if(!confirm('Удалить эту картину навсегда? Прогресс всех пользователей по ней тоже удалится.'))return;
+  await DB.deletePicture(id);
+  showToast('Картина удалена');
+  await renderAdminManageList();
+}
+
+function openAdminQuickEdit(picId){
+  DB.getPictures().then(pics=>{
+    const pic=pics.find(p=>p.id===picId);
+    if(!pic)return;
+    openAdminMetaEdit(pic);
+  });
+}
+
+async function openAdminMetaEdit(pic){
+  const cats=await DB.getCategories();
+  const picCats=pic.categories||['Все'];
+  showModal(`
+    <div class="modal-title">Изменить картину</div>
+    <div class="field"><label>Название</label><input id="qe-name" value="${escapeHtml(pic.name)}"></div>
+    <div class="field"><label>Награда (монет)</label><input id="qe-reward" type="number" value="${pic.reward}" min="0"></div>
+    <div class="field"><label>Стоимость (0 = бесплатная)</label><input id="qe-price" type="number" value="${pic.price}" min="0"></div>
+    <div class="field"><label>Категории</label>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
+        ${cats.map(c=>`<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" class="qe-cat-cb" value="${escapeHtml(c)}" ${picCats.includes(c)?'checked':''} style="width:auto"> ${escapeHtml(c)}</label>`).join('')}
+      </div>
+    </div>
+    <p id="qe-err" class="err"></p>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-orange" style="flex:1" onclick="saveAdminMetaEdit(${pic.id})">Сохранить</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
+    </div>`);
+}
+
+async function saveAdminMetaEdit(picId){
+  const name=document.getElementById('qe-name').value.trim();
+  const err=document.getElementById('qe-err');
+  if(!name){err.textContent='Введите название';return}
+  const reward=parseInt(document.getElementById('qe-reward').value)||0;
+  const price=parseInt(document.getElementById('qe-price').value)||0;
+  const selected=[...document.querySelectorAll('.qe-cat-cb:checked')].map(cb=>cb.value);
+  if(!selected.length){err.textContent='Выберите хотя бы одну категорию';return}
+  try{
+    await DB.updatePicture(picId,{name,reward,price,categories:selected});
+  }catch(e){
+    console.error(e);err.textContent='Ошибка сохранения: '+(e.message||'неизвестная ошибка');return;
+  }
+  closeModal();
+  showToast('Сохранено');
+  if(document.getElementById('admin-manage-overlay')){
+    await renderAdminManageList();
+  }else{
+    await renderHome();
+  }
+}
+
+function setupDragReorder(grid,pics,onReorder){
+  let dragSrcCard=null;
+  grid.querySelectorAll('.pic-drag-handle').forEach(handle=>{
+    const card=handle.closest('.pic-card');
+    handle.addEventListener('dragstart',e=>{
+      dragSrcCard=card;
+      e.dataTransfer.effectAllowed='move';
+      card.style.opacity='0.4';
+    });
+    handle.addEventListener('dragend',()=>{
+      if(dragSrcCard)dragSrcCard.style.opacity='1';
+      dragSrcCard=null;
+    });
+  });
+  grid.querySelectorAll('.pic-card').forEach(card=>{
+    card.addEventListener('dragover',e=>{
+      e.preventDefault();
+      if(!dragSrcCard||dragSrcCard===card)return;
+      const rect=card.getBoundingClientRect();
+      const before=(e.clientX-rect.left)<rect.width/2;
+      grid.insertBefore(dragSrcCard,before?card:card.nextSibling);
+    });
+    card.addEventListener('drop',async e=>{
+      e.preventDefault();
+      if(!dragSrcCard)return;
+      const newOrderIds=[...grid.querySelectorAll('.pic-card')].map(c=>parseInt(c.dataset.picId));
+      await Promise.all(newOrderIds.map((id,idx)=>DB.updatePicture(id,{sortOrder:idx})));
+      showToast('Порядок сохранён');
+      if(typeof onReorder==='function')await onReorder();
+    });
+  });
 }
 
 function escapeHtml(s){
@@ -1816,13 +2051,14 @@ async function deleteCat(name){
 }
 
 function openAdminAdd(){
-  _adminState={id:null,cols:16,rows:16,palette:[],labels:[],pixels:null,draft:true,name:'',reward:10,price:0,category:'Все'};
+  _adminState={id:null,cols:16,rows:16,palette:[],labels:[],pixels:null,draft:true,name:'',reward:10,price:0,categories:['Все']};
   _adminState.pixels=makeEmptyPixels(_adminState.cols,_adminState.rows);
   openAdminEditor();
 }
 
 function openAdminEdit(pic){
   _adminState=JSON.parse(JSON.stringify(pic));
+  if(!_adminState.categories||!_adminState.categories.length)_adminState.categories=['Все'];
   if(!_adminState.labels||!_adminState.labels.length)_adminState.labels=_adminState.palette.map((_,i)=>defaultLabel(i));
   openAdminEditor();
 }
@@ -1852,12 +2088,8 @@ function openAdminEditor(){
     <div style="padding:12px;display:flex;flex-direction:column;gap:10px;flex:1">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:12px;color:var(--text2)">Размер:</label>
-        <select id="adm-cols" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;width:auto" onchange="resizeAdminCanvas()">
-          ${[8,12,16,20,24,32,40].map(n=>`<option value="${n}"${as.cols===n?' selected':''}>${n}</option>`).join('')}
-        </select>×
-        <select id="adm-rows" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;width:auto" onchange="resizeAdminCanvas()">
-          ${[8,12,16,20,24,32,40].map(n=>`<option value="${n}"${as.rows===n?' selected':''}>${n}</option>`).join('')}
-        </select>
+        <input type="number" id="adm-cols" value="${as.cols}" min="1" max="256" style="width:64px;padding:4px 6px" onchange="resizeAdminCanvas()">×
+        <input type="number" id="adm-rows" value="${as.rows}" min="1" max="256" style="width:64px;padding:4px 6px" onchange="resizeAdminCanvas()">
         <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="uploadAdminImage()">📁 Загрузить фото</button>
         <input type="file" id="adm-file-input" accept="image/*" style="display:none" onchange="processAdminImage(this)">
       </div>
@@ -1871,8 +2103,9 @@ function openAdminEditor(){
         <button id="adm-tool-paint" class="btn-orange" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('paint')">🖌️ Красить</button>
         <button id="adm-tool-erase" class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="setAdminTool('erase')">🧹 Стереть</button>
         <button class="btn-ghost" style="padding:5px 10px;font-size:12px" onclick="clearAdminCanvas()">🗑️ Очистить всё</button>
+        <button id="adm-pan-toggle" class="btn-ghost hidden" style="padding:5px 10px;font-size:12px" onclick="toggleAdmPanMode()">✋ Двигать</button>
       </div>
-      <div style="overflow:auto;flex:1;display:flex;align-items:center;justify-content:center;touch-action:none" id="adm-canvas-wrap">
+      <div class="draw-canvas-wrap" id="adm-canvas-wrap" style="flex:1;touch-action:none">
         <canvas id="adm-canvas" style="image-rendering:pixelated;cursor:crosshair;touch-action:none;border:1px solid var(--border)"></canvas>
       </div>
     </div>`;
@@ -1880,7 +2113,7 @@ function openAdminEditor(){
   as._tool='paint';
   as._selectedColorIdx=as.palette.length?0:null;
   renderAdminPalette();
-  renderAdminCanvas();
+  renderAdminCanvas(true);
 }
 
 async function closeAdminEditorToDraft(){
@@ -1939,11 +2172,11 @@ function renderAdminPalette(){
 function setAdminLabel(i,val){
   if(!val)return;
   _adminState.labels[i]=val.slice(0,2);
-  renderAdminCanvas();
+  renderAdminCanvas(true);
 }
 function setAdminColorHex(i,val){
   _adminState.palette[i]=val;
-  renderAdminPalette();renderAdminCanvas();
+  renderAdminPalette();renderAdminCanvas(true);
 }
 
 function addAdminColor(){
@@ -1961,29 +2194,34 @@ function removeAdminColor(i){
   as.labels.splice(i,1);
   as.pixels.forEach(row=>row.forEach(px=>{if(px.colorIdx===i)px.colorIdx=-1;else if(px.colorIdx>i)px.colorIdx--;}));
   if(as._selectedColorIdx>=as.palette.length)as._selectedColorIdx=as.palette.length-1;
-  renderAdminPalette();renderAdminCanvas();
+  renderAdminPalette();renderAdminCanvas(true);
 }
 
 function resizeAdminCanvas(){
   _adminState.cols=parseInt(document.getElementById('adm-cols').value);
   _adminState.rows=parseInt(document.getElementById('adm-rows').value);
   _adminState.pixels=makeEmptyPixels(_adminState.cols,_adminState.rows);
-  renderAdminCanvas();
+  renderAdminCanvas(true);
 }
 
 function clearAdminCanvas(){
   _adminState.pixels=makeEmptyPixels(_adminState.cols,_adminState.rows);
-  renderAdminCanvas();
+  renderAdminCanvas(true);
 }
 
-function renderAdminCanvas(){
+function renderAdminCanvas(fitToScreen){
   const as=_adminState;
   const cvs=document.getElementById('adm-canvas');
   if(!cvs)return;
   const wrap=document.getElementById('adm-canvas-wrap');
-  const SIZE=Math.min(Math.floor((wrap.clientWidth-20)/as.cols),Math.floor((wrap.clientHeight-20)/as.rows),28);
-  const cell=Math.max(SIZE,8);
+  if(fitToScreen||!as._admBaseCell){
+    const SIZE=Math.min(Math.floor((wrap.clientWidth-20)/as.cols),Math.floor((wrap.clientHeight-20)/as.rows),28);
+    as._admBaseCell=Math.max(SIZE,4);
+    as._admZoom=1;
+  }
+  const cell=as._admBaseCell*as._admZoom;
   cvs.width=as.cols*cell;cvs.height=as.rows*cell;
+  cvs.style.width=cvs.width+'px';cvs.style.height=cvs.height+'px';
   as._admCell=cell;
   const ctx=cvs.getContext('2d');
   as.pixels.forEach((row,r)=>row.forEach((px,c)=>{
@@ -1991,22 +2229,123 @@ function renderAdminCanvas(){
     if(px.colorIdx<0){ctx.fillStyle='#2A2A2E';ctx.fillRect(x,y,cell,cell);ctx.strokeStyle='#3A3A3E';ctx.lineWidth=0.5;ctx.strokeRect(x,y,cell,cell);}
     else{ctx.fillStyle=as.palette[px.colorIdx]||'#999';ctx.fillRect(x,y,cell,cell);}
   }));
-  cvs.onmousedown=e=>{as._adrawing=true;admPaint(e.clientX,e.clientY)};
+  setupAdminCanvasEvents(cvs,wrap);
+  wrap.classList.toggle('zoomed',as._admZoom>1.05);
+  updateAdmPanToggleVisibility();
+}
+
+function setupAdminCanvasEvents(cvs,wrap){
+  const as=_adminState;
+  cvs.onmousedown=e=>{
+    if(as._admPanMode){
+      as._admPanStartX=e.clientX;as._admPanStartY=e.clientY;
+      as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
+      as._admPanning=true;
+      return;
+    }
+    as._adrawing=true;admPaint(e.clientX,e.clientY);
+  };
   window.removeEventListener('mousemove',admGlobalMove);
   window.removeEventListener('mouseup',admGlobalUp);
   window.addEventListener('mousemove',admGlobalMove);
   window.addEventListener('mouseup',admGlobalUp);
-  cvs.ontouchstart=e=>{e.preventDefault();as._adrawing=true;admPaint(e.touches[0].clientX,e.touches[0].clientY)};
-  cvs.ontouchmove=e=>{e.preventDefault();if(as._adrawing)admPaint(e.touches[0].clientX,e.touches[0].clientY)};
-  cvs.ontouchend=()=>as._adrawing=false;
+
+  cvs.ontouchstart=e=>{
+    if(e.touches.length===1){
+      if(as._admPanMode){
+        as._admPanStartX=e.touches[0].clientX;as._admPanStartY=e.touches[0].clientY;
+        as._admPanScrollX=wrap.scrollLeft;as._admPanScrollY=wrap.scrollTop;
+        as._admPanning=true;
+        return;
+      }
+      e.preventDefault();as._adrawing=true;admPaint(e.touches[0].clientX,e.touches[0].clientY);
+    }else if(e.touches.length===2){
+      as._adrawing=false;as._admPanning=false;
+      as._admPinchDist=getPinchDist(e.touches);
+      as._admPinchZoomStart=as._admZoom;
+    }
+  };
+  cvs.ontouchmove=e=>{
+    if(e.touches.length===1&&as._admPanning){
+      e.preventDefault();
+      wrap.scrollLeft=as._admPanScrollX-(e.touches[0].clientX-as._admPanStartX);
+      wrap.scrollTop=as._admPanScrollY-(e.touches[0].clientY-as._admPanStartY);
+      return;
+    }
+    if(e.touches.length===1&&as._adrawing){
+      e.preventDefault();admPaint(e.touches[0].clientX,e.touches[0].clientY);
+    }else if(e.touches.length===2){
+      e.preventDefault();
+      const dist=getPinchDist(e.touches);
+      setAdmZoom(as._admPinchZoomStart*(dist/as._admPinchDist));
+    }
+  };
+  cvs.ontouchend=()=>{as._adrawing=false;as._admPanning=false;};
+
+  wrap.onwheel=e=>{
+    e.preventDefault();
+    const delta=e.deltaY<0?1.1:0.9;
+    setAdmZoom(as._admZoom*delta);
+  };
 }
+
+function setAdmZoom(z){
+  const as=_adminState;
+  const wrap=document.getElementById('adm-canvas-wrap');
+  const oldZoom=as._admZoom;
+  const centerX=wrap.scrollLeft+wrap.clientWidth/2;
+  const centerY=wrap.scrollTop+wrap.clientHeight/2;
+  as._admZoom=Math.max(0.4,Math.min(8,z));
+  renderAdminCanvas(false);
+  const ratio=as._admZoom/oldZoom;
+  wrap.scrollLeft=centerX*ratio-wrap.clientWidth/2;
+  wrap.scrollTop=centerY*ratio-wrap.clientHeight/2;
+}
+
+function toggleAdmPanMode(){
+  const as=_adminState;
+  as._admPanMode=!as._admPanMode;
+  const btn=document.getElementById('adm-pan-toggle');
+  const cvs=document.getElementById('adm-canvas');
+  if(as._admPanMode){
+    btn.className='btn-orange';btn.style.padding='5px 10px';btn.style.fontSize='12px';
+    if(cvs)cvs.style.cursor='grab';
+  }else{
+    btn.className='btn-ghost';btn.style.padding='5px 10px';btn.style.fontSize='12px';
+    if(cvs)cvs.style.cursor='crosshair';
+  }
+}
+
+function updateAdmPanToggleVisibility(){
+  const as=_adminState;
+  const btn=document.getElementById('adm-pan-toggle');
+  if(!btn)return;
+  if(as._admZoom>1.05){
+    btn.classList.remove('hidden');
+  }else{
+    btn.classList.add('hidden');
+    as._admPanMode=false;
+    const cvs=document.getElementById('adm-canvas');
+    if(cvs)cvs.style.cursor='crosshair';
+    btn.className='btn-ghost';btn.style.padding='5px 10px';btn.style.fontSize='12px';
+  }
+}
+
 function admGlobalMove(e){
-  if(_adminState._adrawing&&document.getElementById('admin-editor-overlay'))admPaint(e.clientX,e.clientY);
+  const as=_adminState;
+  if(as._admPanning&&document.getElementById('admin-editor-overlay')){
+    const wrap=document.getElementById('adm-canvas-wrap');
+    wrap.scrollLeft=as._admPanScrollX-(e.clientX-as._admPanStartX);
+    wrap.scrollTop=as._admPanScrollY-(e.clientY-as._admPanStartY);
+    return;
+  }
+  if(as._adrawing&&document.getElementById('admin-editor-overlay'))admPaint(e.clientX,e.clientY);
 }
-function admGlobalUp(){_adminState._adrawing=false;}
+function admGlobalUp(){_adminState._adrawing=false;_adminState._admPanning=false;}
 
 function admPaint(clientX,clientY){
   const as=_adminState;
+  if(as._admPanMode)return;
   if((as._selectedColorIdx===null||as._selectedColorIdx===undefined)&&as._tool!=='erase')return;
   const cvs=document.getElementById('adm-canvas');
   const rect=cvs.getBoundingClientRect();
@@ -2031,37 +2370,101 @@ function processAdminImage(input){
   reader.onload=e=>{
     const img=new Image();
     img.onload=()=>{
-      const as=_adminState;
-      if(!as.palette.length){showToast('Сначала добавьте хотя бы один цвет в палитру');return}
-      const off=document.createElement('canvas');
-      off.width=as.cols;off.height=as.rows;
-      const ctx=off.getContext('2d');
-      ctx.drawImage(img,0,0,as.cols,as.rows);
-      const data=ctx.getImageData(0,0,as.cols,as.rows).data;
-      as.pixels=Array.from({length:as.rows},(_,r)=>Array.from({length:as.cols},(_,c)=>{
-        const i=(r*as.cols+c)*4;
-        const [rr,gg,bb]=[data[i],data[i+1],data[i+2]];
-        const a=data[i+3];
-        if(a<128)return{colorIdx:-1};
-        let best=-1,bestD=Infinity;
-        as.palette.forEach((col,pi)=>{
-          const {r:pr,g:pg,b:pb}=hexToRgb(col);
-          const d=(rr-pr)**2+(gg-pg)**2+(bb-pb)**2;
-          if(d<bestD){bestD=d;best=pi;}
-        });
-        return{colorIdx:best};
-      }));
-      renderAdminCanvas();
+      _adminState._pendingImg=img;
+      const existingCount=_adminState.palette.length;
+      showModal(`
+        <div class="modal-title">Автоматические цвета</div>
+        <p style="color:var(--text2);font-size:14px;margin-bottom:12px">Сколько цветов создать автоматически на основе фото?${existingCount?` Уже добавленные вами ${existingCount} цвет(а) тоже будут использованы.`:''}</p>
+        <div class="field"><label>Количество дополнительных цветов</label><input id="auto-color-count" type="number" value="6" min="1" max="32"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-orange" style="flex:1" onclick="confirmAutoColors()">Создать</button>
+          <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
+        </div>`);
+      input.value='';
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
+function confirmAutoColors(){
+  const as=_adminState;
+  const img=as._pendingImg;
+  if(!img)return;
+  const autoCount=Math.max(1,Math.min(32,parseInt(document.getElementById('auto-color-count').value)||6));
+  closeModal();
+
+  const off=document.createElement('canvas');
+  off.width=as.cols;off.height=as.rows;
+  const ctx=off.getContext('2d');
+  ctx.drawImage(img,0,0,as.cols,as.rows);
+  const data=ctx.getImageData(0,0,as.cols,as.rows).data;
+
+  // собираем непрозрачные пиксели
+  const samples=[];
+  for(let i=0;i<data.length;i+=4){
+    if(data[i+3]>=128)samples.push([data[i],data[i+1],data[i+2]]);
+  }
+  const existingPalette=as.palette.map(hexToRgb).map(c=>[c.r,c.g,c.b]);
+  const generated=kMeansColors(samples,autoCount);
+  const fullPaletteRgb=[...existingPalette,...generated];
+  const fullPaletteHex=fullPaletteRgb.map(rgbToHex);
+
+  as.palette=fullPaletteHex;
+  as.labels=fullPaletteHex.map((_,i)=>defaultLabel(i));
+
+  as.pixels=Array.from({length:as.rows},(_,r)=>Array.from({length:as.cols},(_,c)=>{
+    const i=(r*as.cols+c)*4;
+    const a=data[i+3];
+    if(a<128)return{colorIdx:-1};
+    const [rr,gg,bb]=[data[i],data[i+1],data[i+2]];
+    let best=-1,bestD=Infinity;
+    fullPaletteRgb.forEach(([pr,pg,pb],pi)=>{
+      const d=(rr-pr)**2+(gg-pg)**2+(bb-pb)**2;
+      if(d<bestD){bestD=d;best=pi;}
+    });
+    return{colorIdx:best};
+  }));
+
+  as._selectedColorIdx=as.palette.length?0:null;
+  as._pendingImg=null;
+  renderAdminPalette();
+  renderAdminCanvas(true);
+  showToast('Цвета созданы из фото!');
+}
+
+function rgbToHex([r,g,b]){
+  return'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+
+function kMeansColors(samples,k){
+  if(samples.length===0)return Array.from({length:k},()=>[200,200,200]);
+  if(samples.length<=k)return samples;
+  // случайные начальные центры из выборки
+  let centers=[];
+  const step=Math.floor(samples.length/k);
+  for(let i=0;i<k;i++)centers.push(samples[Math.min(i*step,samples.length-1)].slice());
+
+  for(let iter=0;iter<8;iter++){
+    const sums=centers.map(()=>[0,0,0,0]);
+    for(const [r,g,b] of samples){
+      let best=0,bestD=Infinity;
+      for(let i=0;i<centers.length;i++){
+        const [cr,cg,cb]=centers[i];
+        const d=(r-cr)**2+(g-cg)**2+(b-cb)**2;
+        if(d<bestD){bestD=d;best=i;}
+      }
+      sums[best][0]+=r;sums[best][1]+=g;sums[best][2]+=b;sums[best][3]++;
+    }
+    centers=centers.map((c,i)=>sums[i][3]>0?[sums[i][0]/sums[i][3],sums[i][1]/sums[i][3],sums[i][2]/sums[i][3]]:c);
+  }
+  return centers;
+}
+
 async function saveAdminDraft(){
   const as=_adminState;
   as.draft=true;
-  const save={name:as.name||'Черновик',cols:as.cols,rows:as.rows,palette:as.palette,pixels:as.pixels,draft:true,reward:as.reward||10,price:as.price||0,category:as.category||'Все',createdBy:window._cu.login,labels:as.labels};
+  const save={name:as.name||'Черновик',cols:as.cols,rows:as.rows,palette:as.palette,pixels:as.pixels,draft:true,reward:as.reward||10,price:as.price||0,categories:as.categories&&as.categories.length?as.categories:['Все'],createdBy:window._cu.login,labels:as.labels};
   if(as.id){await DB.updatePicture(as.id,save);}
   else{const created=await DB.createPicture(save);as.id=created.id;}
 }
@@ -2070,16 +2473,18 @@ async function openAdminPublish(){
   if(!_adminState.palette.length){showToast('Добавьте хотя бы один цвет');return}
   const cats=await DB.getCategories();
   const as=_adminState;
+  const picCats=as.categories&&as.categories.length?as.categories:['Все'];
   showModal(`
     <div class="modal-title">Настройки картины</div>
     <div class="field"><label>Название</label><input id="ap-name" value="${escapeHtml(as.name||'')}" placeholder="Название картины"></div>
     <div class="field"><label>Награда (монет)</label><input id="ap-reward" type="number" value="${as.reward||10}" min="0"></div>
     <div class="field"><label>Стоимость (0 = бесплатная)</label><input id="ap-price" type="number" value="${as.price||0}" min="0"></div>
-    <div class="field"><label>Категория</label>
-      <select id="ap-cat">
-        ${cats.map(c=>`<option value="${escapeHtml(c)}"${as.category===c?' selected':''}>${escapeHtml(c)}</option>`).join('')}
-      </select>
+    <div class="field"><label>Категории (можно несколько)</label>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
+        ${cats.map(c=>`<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" class="ap-cat-cb" value="${escapeHtml(c)}" ${picCats.includes(c)?'checked':''} style="width:auto"> ${escapeHtml(c)}</label>`).join('')}
+      </div>
     </div>
+    <p id="ap-err" class="err"></p>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-orange" style="flex:1" onclick="publishAdminPic()">Опубликовать</button>
       <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
@@ -2089,13 +2494,16 @@ async function openAdminPublish(){
 async function publishAdminPic(){
   const as=_adminState;
   const name=document.getElementById('ap-name').value.trim();
-  if(!name){showToast('Введите название');return}
+  const err=document.getElementById('ap-err');
+  if(!name){err.textContent='Введите название';return}
+  const selectedCats=[...document.querySelectorAll('.ap-cat-cb:checked')].map(cb=>cb.value);
+  if(!selectedCats.length){err.textContent='Выберите хотя бы одну категорию';return}
   as.name=name;
   as.reward=parseInt(document.getElementById('ap-reward').value)||0;
   as.price=parseInt(document.getElementById('ap-price').value)||0;
-  as.category=document.getElementById('ap-cat').value;
+  as.categories=selectedCats;
   as.draft=false;
-  const save={name:as.name,cols:as.cols,rows:as.rows,palette:as.palette,pixels:as.pixels,draft:false,reward:as.reward,price:as.price,category:as.category,createdBy:window._cu.login,labels:as.labels};
+  const save={name:as.name,cols:as.cols,rows:as.rows,palette:as.palette,pixels:as.pixels,draft:false,reward:as.reward,price:as.price,categories:as.categories,createdBy:window._cu.login,labels:as.labels};
   try{
     if(as.id){await DB.updatePicture(as.id,save);}
     else{await DB.createPicture(save);}
@@ -2132,9 +2540,60 @@ window.addEventListener('resize',()=>{
   if(isDrawOpen())renderDrawCanvas(true);
 });
 
+// ============================================================
+// PULL TO REFRESH (мобильные устройства)
+// ============================================================
+function setupPullToRefresh(){
+  const scrollEl=document.getElementById('view-home');
+  const indicator=document.getElementById('ptr-indicator');
+  const spinner=document.getElementById('ptr-spinner');
+  const label=document.getElementById('ptr-label');
+  const THRESHOLD=70;
+  let startY=0,pulling=false,refreshing=false;
+
+  scrollEl.addEventListener('touchstart',e=>{
+    if(scrollEl.scrollTop<=0&&getActiveNav()==='home'){
+      startY=e.touches[0].clientY;
+      pulling=true;
+    }else{
+      pulling=false;
+    }
+  },{passive:true});
+
+  scrollEl.addEventListener('touchmove',e=>{
+    if(!pulling||refreshing)return;
+    const diff=e.touches[0].clientY-startY;
+    if(diff>0&&scrollEl.scrollTop<=0){
+      const height=Math.min(diff*0.5,90);
+      indicator.style.height=height+'px';
+      spinner.style.transform=`rotate(${height*4}deg)`;
+      label.textContent=height>=THRESHOLD?'Отпустите, чтобы обновить':'Потяните, чтобы обновить';
+    }
+  },{passive:true});
+
+  scrollEl.addEventListener('touchend',async()=>{
+    if(!pulling||refreshing)return;
+    const height=parseInt(indicator.style.height)||0;
+    pulling=false;
+    if(height>=THRESHOLD){
+      refreshing=true;
+      indicator.style.height='50px';
+      label.textContent='Обновление...';
+      spinner.style.animation='spin .6s linear infinite';
+      await renderHome();
+      spinner.style.animation='';
+      indicator.style.height='0px';
+      refreshing=false;
+    }else{
+      indicator.style.height='0px';
+    }
+  });
+}
+
 async function init(){
   initSupabase();
   setupCatsDrag();
+  setupPullToRefresh();
   document.getElementById('loading-overlay').style.display='none';
 
   const saved=getSavedLogin();
