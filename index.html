@@ -89,10 +89,13 @@ button{cursor:pointer;border:none;border-radius:8px;font-size:14px;font-weight:5
 html.dark .coin-badge{color:#FDBA74}
 .progress-bar{height:3px;background:var(--bg3);border-radius:2px;margin-top:6px;overflow:hidden}
 .progress-fill{height:100%;background:var(--orange);transition:width .3s}
-.lock-overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#fff;font-size:12px}
-.lock-overlay svg{width:26px;height:26px}
+.lock-overlay{position:absolute;inset:0;background:rgba(0,0,0,.3);text-shadow:0 1px 3px rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#fff;font-size:12px}
+.lock-overlay svg{width:26px;height:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.8))}
 .pic-edit-pencil{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
 .pic-drag-handle{position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:grab}
+.pic-restore{background:rgba(34,197,94,.9);font-size:15px}
+.manage-sep{display:flex;align-items:center;gap:10px;margin:22px 0 12px;color:var(--text2);font-size:13px}
+.manage-sep::before,.manage-sep::after{content:'';flex:1;height:1px;background:var(--border)}
 .pic-delete-draft{position:absolute;bottom:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(248,113,113,.85);border:none;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
 
 /* DRAWING SCREEN */
@@ -128,7 +131,7 @@ html.dark .coin-badge{color:#FDBA74}
 .edit-btn:hover{border-color:var(--orange)}
 .section-title{font-size:15px;font-weight:600;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .completed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
-.completed-card{border-radius:10px;overflow:hidden;cursor:pointer;background:var(--bg2);border:1px solid var(--border)}
+.completed-card{position:relative;border-radius:10px;overflow:hidden;cursor:pointer;background:var(--bg2);border:1px solid var(--border)}
 .completed-card canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated}
 
 /* FRIENDS / SEARCH */
@@ -456,7 +459,14 @@ const DB = {
     if('coins' in fields)dbFields.coins=fields.coins;
     if('totalCoins' in fields)dbFields.total_coins=fields.totalCoins;
     if('avatar' in fields)dbFields.avatar=fields.avatar;
-    const {error}=await sb.from('users').update(dbFields).eq('login',login);
+    if('avatarPicId' in fields)dbFields.avatar_pic_id=fields.avatarPicId;
+    if('avatarNotice' in fields)dbFields.avatar_notice=fields.avatarNotice;
+    let {error}=await sb.from('users').update(dbFields).eq('login',login);
+    if(error&&/avatar_pic_id|avatar_notice/.test(error.message||'')){
+      // колонки ещё не добавлены (update.sql не выполнен) — сохраняем остальное
+      delete dbFields.avatar_pic_id;delete dbFields.avatar_notice;
+      error=Object.keys(dbFields).length?(await sb.from('users').update(dbFields).eq('login',login)).error:null;
+    }
     if(error)console.error(error);
   },
   async deleteUser(login){
@@ -532,12 +542,13 @@ const DB = {
     if('draft' in fields)dbFields.is_draft=fields.draft;
     if('labels' in fields)dbFields.labels=fields.labels;
     if('sortOrder' in fields)dbFields.sort_order=fields.sortOrder;
+    if('deleted' in fields)dbFields.is_deleted=fields.deleted;
     _picCache=null;
     const {error}=await sb.from('pictures').update(dbFields).eq('id',id);
     if(error){console.error(error);throw error;}
   },
   async deletePicture(id){
-    if(DEMO_MODE){LS.set('pictures',(LS.get('pictures')||[]).filter(p=>p.id!==id));return;}
+    if(DEMO_MODE){LS.set('pictures',(LS.get('pictures')||[]).filter(p=>p.id!==id));LS.set('progress',(LS.get('progress')||[]).filter(p=>p.pictureId!==id));return;}
     _picCache=null;
     const {error}=await sb.from('pictures').delete().eq('id',id);
     if(error){console.error(error);throw error;}
@@ -589,6 +600,15 @@ const DB = {
     if(error)console.error(error);
   },
 
+  async resetPartialProgress(pictureId){
+    if(DEMO_MODE){
+      const all=LS.get('progress')||[];
+      all.forEach(p=>{if(p.pictureId===pictureId&&!p.full)p.pixels={};});
+      LS.set('progress',all);return;
+    }
+    const {error}=await sb.from('progress').update({pixels:{},updated_at:new Date().toISOString()}).eq('picture_id',pictureId).eq('is_full',false);
+    if(error){console.error(error);throw error;}
+  },
   async getFullCounts(){
     const m={};
     if(DEMO_MODE){(LS.get('progress')||[]).forEach(p=>{if(p.full)m[p.userLogin]=(m[p.userLogin]||0)+1;});return m;}
@@ -646,12 +666,13 @@ const DB = {
 
 function mapUserFromDb(d){
   return{login:d.login,password:d.password,nick:d.nick,desc:d.desc_text||'',
-    coins:d.coins||0,totalCoins:d.total_coins||0,avatar:d.avatar||null,isAdmin:!!d.is_admin};
+    coins:d.coins||0,totalCoins:d.total_coins||0,avatar:d.avatar||null,isAdmin:!!d.is_admin,
+    avatarPicId:d.avatar_pic_id||null,avatarNotice:!!d.avatar_notice};
 }
 function mapPicFromDb(d){
   return{id:d.id,name:d.name,cols:d.cols,rows:d.rows,palette:d.palette,pixels:d.pixels,
     reward:d.reward,price:d.price,categories:(d.categories&&d.categories.length?d.categories:(d.category?[d.category]:['Все'])),
-    draft:d.is_draft,createdBy:d.created_by,labels:d.labels||[],sortOrder:d.sort_order||0};
+    draft:d.is_draft,createdBy:d.created_by,labels:d.labels||[],sortOrder:d.sort_order||0,deleted:!!d.is_deleted};
 }
 function mapProgressFromDb(d){
   return{userLogin:d.user_login,pictureId:d.picture_id,pixels:d.pixels||{},
@@ -861,9 +882,9 @@ const SORT_LABELS={
   bigFirst:'Сначала большие'
 };
 
-function sortPictures(pics){
+function sortPictures(pics,mode){
   const arr=[...pics];
-  switch(_sortMode){
+  switch(mode||_sortMode){
     case 'newest': return arr.sort((a,b)=>b.id-a.id);
     case 'oldest': return arr.sort((a,b)=>a.id-b.id);
     case 'freeFirst': return arr.sort((a,b)=>(a.price>0?1:0)-(b.price>0?1:0));
@@ -874,15 +895,21 @@ function sortPictures(pics){
   }
 }
 
-function openSortMenu(){
+let _manageSort='newest';
+
+// scope: 'home' (Главная) или 'manage' (Все картины) — у каждого своя сортировка
+function openSortMenu(scope){
+  const sc=scope==='manage'?'manage':'home';
+  const cur=sc==='manage'?_manageSort:_sortMode;
   const items=Object.entries(SORT_LABELS).map(([key,label])=>
-    `<button class="btn-ghost w100" style="text-align:left;margin-bottom:6px;${key===_sortMode?'border-color:var(--orange);color:var(--orange)':''}" onclick="setSortMode('${key}')">${label}${key===_sortMode?' ✓':''}</button>`
+    `<button class="btn-ghost w100" style="text-align:left;margin-bottom:6px;${key===cur?'border-color:var(--orange);color:var(--orange)':''}" onclick="setSortMode('${key}','${sc}')">${label}${key===cur?' ✓':''}</button>`
   ).join('');
   showModal(`<div class="modal-title">Сортировка картин</div>${items}`);
 }
-function setSortMode(mode){
-  _sortMode=mode;
+function setSortMode(mode,scope){
   closeModal();
+  if(scope==='manage'){_manageSort=mode;renderAdminManageList();return;}
+  _sortMode=mode;
   renderPictures();
 }
 
@@ -897,7 +924,7 @@ async function renderPictures(){
   home.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
 
   const [allPics,myProgress]=await Promise.all([DB.getPictures(),DB.getAllProgressForUser(cu.login)]);
-  let pics=allPics.filter(p=>!p.draft);
+  let pics=allPics.filter(p=>!p.draft&&!p.deleted);
   if(_activeCat!=='Все')pics=pics.filter(p=>(p.categories||['Все']).includes(_activeCat));
 
   const progressMap={};
@@ -938,6 +965,7 @@ async function renderPictures(){
           ${locked?`<div class="lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span style="display:flex;align-items:center;gap:4px"><span class="coin-icon"></span>${p.price}</span></div>`:''}
           ${cu.isAdmin?`<button class="pic-edit-pencil" onclick="event.stopPropagation();openAdminQuickEdit(${p.id})" title="Изменить">✏️</button>`:''}
           ${cu.isAdmin?`<div class="pic-drag-handle" draggable="true" title="Перетащить">⠿</div>`:''}
+          ${cu.isAdmin?`<button class="pic-delete-draft" onclick="event.stopPropagation();askDeletePicture(${p.id})" title="Удалить">🗑</button>`:''}
         </div>
         <div class="pic-info">
           <div class="pic-name">${escapeHtml(p.name)}</div>
@@ -993,7 +1021,6 @@ async function openAdminManageAll(){
     <div class="draw-top">
       <button class="btn-ghost" style="padding:7px 12px" onclick="closeAdminManageAll()">← Назад</button>
       <span class="draw-title" style="position:static;transform:none;max-width:none">Все картины</span>
-      <span style="margin-left:auto;font-size:12px;color:var(--text2)">Тащите ⠿, чтобы изменить порядок</span>
     </div>
     <div class="main-content" id="admin-manage-content" style="flex:1;overflow-y:auto"></div>`;
   document.body.appendChild(overlay);
@@ -1003,6 +1030,28 @@ async function openAdminManageAll(){
 function closeAdminManageAll(){
   const el=document.getElementById('admin-manage-overlay');
   if(el)el.remove();
+  if(getActiveNav()==='home')renderPictures();
+}
+
+const SORT_ICON='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h10M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-3 3M17 5l3 3M17 19l-3-3M17 19l3-3"/></svg>';
+
+function manageCardHtml(p,progress,deleted){
+  const isMineFull=progress&&progress.full;
+  const buttons=deleted
+    ?`<button class="pic-edit-pencil pic-restore" onclick="event.stopPropagation();restorePicture(${p.id})" title="Вернуть">↩</button>
+      <button class="pic-delete-draft" onclick="event.stopPropagation();askPermDelete(${p.id})" title="Удалить окончательно">🗑</button>`
+    :`<button class="pic-edit-pencil" onclick="event.stopPropagation();openAdminQuickEdit(${p.id})" title="Изменить">✏️</button>
+      <button class="pic-delete-draft" onclick="event.stopPropagation();askDeletePicture(${p.id})" title="Удалить">🗑</button>`;
+  return `
+    <div class="pic-thumb">
+      <canvas id="manage-thumb-${p.id}" width="${p.cols}" height="${p.rows}"></canvas>
+      ${isMineFull?'<div style="position:absolute;bottom:4px;left:4px;background:rgba(34,197,94,.85);color:#fff;font-size:10px;padding:2px 6px;border-radius:6px">✓ закрашено вами</div>':''}
+      ${buttons}
+    </div>
+    <div class="pic-info">
+      <div class="pic-name">${escapeHtml(p.name)}</div>
+      <div class="pic-meta"><span class="coin-badge"><span class="coin-icon"></span>+${p.reward}</span>${p.price?`<span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px"><span class="coin-icon"></span>${p.price}</span>`:''}</div>
+    </div>`;
 }
 
 async function renderAdminManageList(){
@@ -1015,48 +1064,107 @@ async function renderAdminManageList(){
   const progressMap={};
   myProgress.forEach(p=>progressMap[p.pictureId]=p);
 
-  const pics=allPics.filter(p=>!p.draft).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+  const real=allPics.filter(p=>!p.draft);
+  const active=sortPictures(real.filter(p=>!p.deleted),_manageSort);
+  const deleted=sortPictures(real.filter(p=>p.deleted),_manageSort);
 
-  if(!pics.length){
-    container.innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--text2)">Нет опубликованных картин</div>';
+  container.innerHTML='';
+  const header=document.createElement('div');
+  header.style.cssText='display:flex;justify-content:flex-end;margin-bottom:8px';
+  header.innerHTML=`<button class="btn-ghost" style="padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:5px" onclick="openSortMenu('manage')">${SORT_ICON}${SORT_LABELS[_manageSort]}</button>`;
+  container.appendChild(header);
+
+  if(!real.length){
+    container.insertAdjacentHTML('beforeend','<div style="text-align:center;padding:60px 20px;color:var(--text2)">Нет опубликованных картин</div>');
     return;
   }
 
-  container.innerHTML='';
-  const grid=document.createElement('div');
-  grid.className='pictures-grid';
-  pics.forEach(p=>{
-    const progress=progressMap[p.id];
-    const isMineFull=progress&&progress.full;
-    const card=document.createElement('div');
-    card.className='pic-card';
-    card.style.cursor='default';
-    card.style.position='relative';
-    card.innerHTML=`
-      <div class="pic-thumb">
-        <canvas id="manage-thumb-${p.id}" width="${p.cols}" height="${p.rows}"></canvas>
-        ${isMineFull?'<div style="position:absolute;bottom:4px;left:4px;background:rgba(34,197,94,.85);color:#fff;font-size:10px;padding:2px 6px;border-radius:6px">✓ закрашено вами</div>':''}
-        <button class="pic-edit-pencil" onclick="event.stopPropagation();openAdminQuickEdit(${p.id})" title="Изменить">✏️</button>
-        <div class="pic-drag-handle" draggable="true" title="Перетащить">⠿</div>
-        <button class="pic-delete-draft" onclick="event.stopPropagation();deleteManagedPicture(${p.id})" title="Удалить">🗑</button>
-      </div>
-      <div class="pic-info">
-        <div class="pic-name">${escapeHtml(p.name)}</div>
-        <div class="pic-meta"><span class="coin-badge"><span class="coin-icon"></span>+${p.reward}</span>${p.price?`<span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px"><span class="coin-icon"></span>${p.price}</span>`:''}</div>
-      </div>`;
-    card.dataset.picId=p.id;
-    grid.appendChild(card);
-    setTimeout(()=>drawFullColorThumb(p,`manage-thumb-${p.id}`),0);
-  });
-  container.appendChild(grid);
-  setupDragReorder(grid,pics,renderAdminManageList);
+  const makeGrid=(list,isDeleted)=>{
+    const grid=document.createElement('div');
+    grid.className='pictures-grid';
+    list.forEach(p=>{
+      const card=document.createElement('div');
+      card.className='pic-card';
+      card.style.cursor='default';
+      card.style.position='relative';
+      if(isDeleted)card.style.opacity='.8';
+      card.innerHTML=manageCardHtml(p,progressMap[p.id],isDeleted);
+      card.dataset.picId=p.id;
+      grid.appendChild(card);
+      setTimeout(()=>drawFullColorThumb(p,`manage-thumb-${p.id}`),0);
+    });
+    return grid;
+  };
+
+  if(active.length)container.appendChild(makeGrid(active,false));
+  else container.insertAdjacentHTML('beforeend','<div style="text-align:center;padding:30px 20px;color:var(--text2)">Нет активных картин</div>');
+
+  if(deleted.length){
+    const sep=document.createElement('div');
+    sep.className='manage-sep';
+    sep.innerHTML='<span>Удалённые</span>';
+    container.appendChild(sep);
+    container.appendChild(makeGrid(deleted,true));
+  }
 }
 
-async function deleteManagedPicture(id){
-  if(!confirm('Удалить эту картину навсегда? Прогресс всех пользователей по ней тоже удалится.'))return;
-  await DB.deletePicture(id);
+// ---------- удаление (двойное подтверждение) ----------
+async function picNameById(id){
+  const l=await DB.getPictures();
+  const p=l.find(x=>x.id===id);
+  return p?p.name:'';
+}
+function yesNoModal(title,text,yesCall){
+  showModal(`<div class="modal-title">${title}</div>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:20px">${text}</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn-orange" style="flex:1" onclick="${yesCall}">Да</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal()">Нет</button>
+    </div>`);
+}
+
+async function askDeletePicture(id){
+  const name=await picNameById(id);
+  yesNoModal('Точно?',`Убрать «${escapeHtml(name)}» у всех пользователей?`,`askDeletePicture2(${id})`);
+}
+function askDeletePicture2(id){
+  yesNoModal('Точно, точно?','Картина пропадёт у всех. Останется только во «Все картины».',`doSoftDelete(${id})`);
+}
+async function doSoftDelete(id){
+  try{await DB.updatePicture(id,{deleted:true});}
+  catch(e){console.error(e);closeModal();showToast('Ошибка: '+(e.message||'выполни update.sql в Supabase'));return;}
+  closeModal();
   showToast('Картина удалена');
-  await renderAdminManageList();
+  refreshAfterPictureChange();
+}
+function refreshAfterPictureChange(){
+  if(document.getElementById('admin-manage-overlay'))renderAdminManageList();
+  else if(getActiveNav()==='home')renderPictures();
+}
+
+async function askPermDelete(id){
+  const name=await picNameById(id);
+  yesNoModal('Точно?',`Удалить «${escapeHtml(name)}» окончательно?`,`askPermDelete2(${id})`);
+}
+function askPermDelete2(id){
+  yesNoModal('Точно, точно?','Это нельзя отменить: картина и прогресс по ней у всех пользователей пропадут навсегда.',`doPermDelete(${id})`);
+}
+async function doPermDelete(id){
+  try{await DB.deletePicture(id);}
+  catch(e){console.error(e);closeModal();showToast('Ошибка: '+(e.message||'не удалось удалить'));return;}
+  closeModal();
+  showToast('Картина удалена окончательно');
+  refreshAfterPictureChange();
+}
+
+// вернуть удалённую картину: цена и категории те же; разблокировки остаются, недокрашенный прогресс сбрасывается
+async function restorePicture(id){
+  try{
+    await DB.updatePicture(id,{deleted:false});
+    await DB.resetPartialProgress(id);
+  }catch(e){console.error(e);showToast('Ошибка: '+(e.message||'не удалось вернуть'));return;}
+  showToast('Картина возвращена');
+  refreshAfterPictureChange();
 }
 
 function openAdminQuickEdit(picId){
@@ -1173,8 +1281,7 @@ function drawThumb(pic,progress,canvasId){
       if(progress&&progress.pixels[key]!==undefined){
         img.data[i]=rgb.r;img.data[i+1]=rgb.g;img.data[i+2]=rgb.b;img.data[i+3]=255;
       }else{
-        const brightness=0.299*rgb.r+0.587*rgb.g+0.114*rgb.b;
-        const v=brightness<128?60:215;
+        const v=picGrays(pic)[px.colorIdx];
         img.data[i]=v;img.data[i+1]=v;img.data[i+2]=v;img.data[i+3]=255;
       }
     }
@@ -1243,7 +1350,7 @@ window._themeStamp=window._themeStamp||0;
 class PixelView{
   constructor(wrap,cvs,opts){
     this.wrap=wrap;this.cvs=cvs;this.ctx=cvs.getContext('2d');
-    this.o=Object.assign({paint:false,touchAlwaysPaints:false,hintEl:null,render:null,paintAt:null,canPaintNear:null,touchRadius:null,onStrokeEnd:null},opts);
+    this.o=Object.assign({paint:false,touchAlwaysPaints:false,interpolate:false,hintEl:null,render:null,paintAt:null,canPaintAt:null,onStrokeEnd:null},opts);
     this.cols=1;this.rows=1;this.scale=10;this.fitScale=10;this.ox=0;this.oy=0;
     this.w=0;this.h=0;this.dpr=1;this.userZoomed=false;
     this.ptrs=new Map();this.mode='none';this._raf=0;this._hintT=0;
@@ -1360,7 +1467,6 @@ class PixelView{
   }
 
   _local(x,y){const r=this.cvs.getBoundingClientRect();return{x:x-r.left,y:y-r.top};}
-  _radius(type){return(type==='touch'&&this.o.touchRadius)?this.o.touchRadius(this.scale):0;}
 
   _bind(){
     const c=this.cvs;
@@ -1395,7 +1501,7 @@ class PixelView{
       else{this.mode='pan';this.cvs.style.cursor='grabbing';}
     }else{
       const p=this._local(e.clientX,e.clientY);
-      const can=this.o.paint&&(this.o.touchAlwaysPaints||(this.o.canPaintNear&&this.o.canPaintNear(p.x,p.y,this._radius('touch'),this)));
+      const can=this.o.paint&&(this.o.touchAlwaysPaints||(this.o.canPaintAt&&this.o.canPaintAt(p.x,p.y,this)));
       if(can){this.mode='paint';this._strokeStart(e.clientX,e.clientY);}
       else this.mode='pan';
     }
@@ -1406,11 +1512,7 @@ class PixelView{
     p.x=e.clientX;p.y=e.clientY;
     if(this.mode==='pinch'){if(this.ptrs.size>=2)this._pinchMove();}
     else if(this.mode==='pan'){this.ox+=dx;this.oy+=dy;this.clampPan();this.requestRender();}
-    else if(this.mode==='paint'){
-      const evs=e.getCoalescedEvents?e.getCoalescedEvents():null;
-      if(evs&&evs.length>1)evs.forEach(ev=>this._strokeTo(ev.clientX,ev.clientY));
-      else this._strokeTo(e.clientX,e.clientY);
-    }
+    else if(this.mode==='paint'){this._strokeTo(e.clientX,e.clientY);}
   }
   _up(e){
     if(!this.ptrs.has(e.pointerId))return;
@@ -1438,14 +1540,16 @@ class PixelView{
 
   _strokeStart(x,y){
     const p=this._local(x,y);this._last=p;
-    if(this.o.paintAt)this.o.paintAt(p.x,p.y,this._radius(this._type),this);
+    if(this.o.paintAt)this.o.paintAt(p.x,p.y,this);
   }
   _strokeTo(x,y){
     if(!this._last||!this.o.paintAt)return;
-    const p=this._local(x,y),l=this._last,dx=p.x-l.x,dy=p.y-l.y,dist=Math.hypot(dx,dy);
-    if(dist<0.5)return;
-    const step=Math.max(2,Math.min(this.scale*0.5,8)),n=Math.max(1,Math.ceil(dist/step)),r=this._radius(this._type);
-    for(let i=1;i<=n;i++)this.o.paintAt(l.x+dx*i/n,l.y+dy*i/n,r,this);
+    const p=this._local(x,y),l=this._last;
+    if(this.o.interpolate){
+      const dx=p.x-l.x,dy=p.y-l.y,dist=Math.hypot(dx,dy);
+      const step=Math.max(2,Math.min(this.scale*0.5,8)),n=Math.max(1,Math.ceil(dist/step));
+      for(let i=1;i<=n;i++)this.o.paintAt(l.x+dx*i/n,l.y+dy*i/n,this);
+    }else this.o.paintAt(p.x,p.y,this);
     this._last=p;
   }
   _endStroke(){
@@ -1474,9 +1578,7 @@ function getPlayView(){
     hintEl:document.getElementById('zoom-hint'),
     render:renderPlay,
     paintAt:playPaintAt,
-    canPaintNear:playCanPaintNear,
-    // на телефоне палец толстый: на мелких клетках красим и соседние клетки выбранного цвета
-    touchRadius:s=>s>=22?0:Math.min(8,Math.round(22-s)),
+    canPaintAt:playCanPaintAt,
     onStrokeEnd:()=>{checkCompletion();}
   });
   return _playView;
@@ -1577,18 +1679,20 @@ function renderPlay(ctx,v){
   }
 }
 
-function playCellRange(px,py,r,v){
-  const s=v.scale,ds=_drawState;
+// хитбокс клетки = 110% (по 5% запаса с каждой стороны): красится клетка под курсором
+// и (только у самой границы) соседняя клетка выбранного цвета
+function playCellRange(px,py,v){
+  const s=v.scale,ds=_drawState,fx=(px-v.ox)/s,fy=(py-v.oy)/s,m=0.05;
   return{
-    c0:Math.max(0,Math.floor((px-r-v.ox)/s)),c1:Math.min(ds.cols-1,Math.floor((px+r-v.ox)/s)),
-    r0:Math.max(0,Math.floor((py-r-v.oy)/s)),r1:Math.min(ds.rows-1,Math.floor((py+r-v.oy)/s))
+    c0:Math.max(0,Math.floor(fx-m)),c1:Math.min(ds.cols-1,Math.floor(fx+m)),
+    r0:Math.max(0,Math.floor(fy-m)),r1:Math.min(ds.rows-1,Math.floor(fy+m))
   };
 }
 
-function playCanPaintNear(px,py,r,v){
+function playCanPaintAt(px,py,v){
   const ds=_drawState;if(!ds.pic)return false;
   const sel=ds.remainingColors[ds.selectedColorIdx];if(sel===undefined)return false;
-  const g=playCellRange(px,py,r,v);
+  const g=playCellRange(px,py,v);
   for(let rr=g.r0;rr<=g.r1;rr++)for(let cc=g.c0;cc<=g.c1;cc++){
     const i=rr*ds.cols+cc;
     if(!ds.done[i]&&ds.target[i]===sel)return true;
@@ -1596,10 +1700,10 @@ function playCanPaintNear(px,py,r,v){
   return false;
 }
 
-function playPaintAt(px,py,r,v){
+function playPaintAt(px,py,v){
   const ds=_drawState;if(!ds.pic)return;
   const sel=ds.remainingColors[ds.selectedColorIdx];if(sel===undefined)return;
-  const g=playCellRange(px,py,r,v);
+  const g=playCellRange(px,py,v);
   let changed=false;
   for(let rr=g.r0;rr<=g.r1;rr++)for(let cc=g.c0;cc<=g.c1;cc++){
     const i=rr*ds.cols+cc;
@@ -1896,7 +2000,7 @@ async function removeFromTop(login){
 // ============================================================
 async function viewProfile(login){
   const cu=window._cu;
-  const u=login===cu.login?cu:(await DB.getUser(login))||cu;
+  const u=login===cu.login?await refreshCurrentUser():((await DB.getUser(login))||cu);
   const isSelf=u.login===cu.login;
   const isAdminViewing=cu.isAdmin&&!isSelf;
 
@@ -1949,7 +2053,7 @@ async function viewProfile(login){
       if(!pic)return;
       const card=document.createElement('div');
       card.className='completed-card';
-      card.innerHTML=`<canvas id="cth-${cp.pictureId}-${login}" width="${pic.cols}" height="${pic.rows}"></canvas>`;
+      card.innerHTML=`<canvas id="cth-${cp.pictureId}-${login}" width="${pic.cols}" height="${pic.rows}"></canvas>${cu.isAdmin?`<button class="pic-delete-draft" onclick="event.stopPropagation();askRemoveFromProfile('${u.login}',${cp.pictureId})" title="Убрать из профиля">🗑</button>`:''}`;
       card.onclick=()=>viewCompleted(pic);
       grid.appendChild(card);
       setTimeout(()=>drawFullColorThumb(pic,`cth-${cp.pictureId}-${login}`),0);
@@ -1972,6 +2076,7 @@ async function viewProfile(login){
       setTimeout(()=>drawFullColorThumb(pic,`apth-${cp.pictureId}`),0);
     });
   }
+  if(isSelf&&u.avatarNotice)showAvatarNotice();
 }
 
 function drawFullColorThumb(pic,id){
@@ -2066,8 +2171,8 @@ function changeAvatar(input){
       ctx.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,160,160);
       const dataUrl=off.toDataURL('image/jpeg',0.85);
       const cu=await refreshCurrentUser();
-      await DB.updateUser(cu.login,{avatar:dataUrl});
-      cu.avatar=dataUrl;window._cu=cu;
+      await DB.updateUser(cu.login,{avatar:dataUrl,avatarPicId:null});
+      cu.avatar=dataUrl;cu.avatarPicId=null;window._cu=cu;
       await viewProfile(cu.login);
     };
     img.src=e.target.result;
@@ -2075,14 +2180,11 @@ function changeAvatar(input){
   reader.readAsDataURL(file);
 }
 
-async function setAvatarFromPic(pic){
-  // Рисуем картину пиксель-в-пиксель без сглаживания, затем увеличиваем "жёстким"
-  // масштабированием (imageSmoothingEnabled=false), чтобы маленькие картинки
-  // не блюрились и аккуратно влезали в круглый аватар.
+// Аватар из картины: рисуем пиксель-в-пиксель и увеличиваем «жёстко» (без размытия)
+function picAvatarDataUrl(pic){
   const off=document.createElement('canvas');
   off.width=pic.cols;off.height=pic.rows;
   const ctx=off.getContext('2d');
-  ctx.imageSmoothingEnabled=false;
   const img=ctx.createImageData(pic.cols,pic.rows);
   pic.pixels.forEach((row,r)=>row.forEach((px,c)=>{
     const i=(r*pic.cols+c)*4;
@@ -2091,19 +2193,71 @@ async function setAvatarFromPic(pic){
     img.data[i]=rgb.r;img.data[i+1]=rgb.g;img.data[i+2]=rgb.b;img.data[i+3]=255;
   }));
   ctx.putImageData(img,0,0);
-  const targetSize=160;
-  const scale=Math.max(1,Math.ceil(targetSize/Math.max(pic.cols,pic.rows)));
+  const scale=Math.max(1,Math.ceil(160/Math.max(pic.cols,pic.rows)));
   const big=document.createElement('canvas');
   big.width=pic.cols*scale;big.height=pic.rows*scale;
   const bigCtx=big.getContext('2d');
   bigCtx.imageSmoothingEnabled=false;
   bigCtx.drawImage(off,0,0,big.width,big.height);
+  return big.toDataURL('image/png');
+}
+
+async function setAvatarFromPic(pic){
   const cu=await refreshCurrentUser();
-  const dataUrl=big.toDataURL('image/png');
-  await DB.updateUser(cu.login,{avatar:dataUrl});
-  cu.avatar=dataUrl;window._cu=cu;
+  const dataUrl=picAvatarDataUrl(pic);
+  await DB.updateUser(cu.login,{avatar:dataUrl,avatarPicId:pic.id});
+  cu.avatar=dataUrl;cu.avatarPicId=pic.id;window._cu=cu;
   await viewProfile(cu.login);
   showToast('Аватар установлен!');
+}
+
+// ---------- M_fen убирает закрашенную картину из профиля пользователя ----------
+function askRemoveFromProfile(login,picId){
+  yesNoModal('Убрать из профиля?',`Картина пропадёт из профиля «${escapeHtml(login)}». Если её аватарка стояла из этой картины, она заменится на случайную.`,`adminRemoveFromProfile('${login}',${picId})`);
+}
+
+async function adminRemoveFromProfile(login,picId){
+  closeModal();
+  try{
+    const [pics,u]=await Promise.all([DB.getPictures(),DB.getUser(login)]);
+    const pic=pics.find(p=>p.id===picId);
+    if(!u)return;
+    // картина снова доступна этому пользователю (уже разблокирована), прогресс с нуля
+    await DB.updateProgress(login,picId,{pixels:{},full:false,doneAt:null,purchased:true});
+    const isAvatar=u.avatarPicId===picId||(pic&&u.avatar&&u.avatar===picAvatarDataUrl(pic));
+    if(isAvatar){
+      const prog=await DB.getAllProgressForUser(login);
+      const left=prog.filter(p=>p.full&&p.pictureId!==picId).map(p=>pics.find(x=>x.id===p.pictureId)).filter(Boolean);
+      if(left.length){
+        const rp=left[Math.floor(Math.random()*left.length)];
+        await DB.updateUser(login,{avatar:picAvatarDataUrl(rp),avatarPicId:rp.id,avatarNotice:true});
+      }else{
+        await DB.updateUser(login,{avatar:null,avatarPicId:null,avatarNotice:true});
+      }
+    }
+  }catch(e){console.error(e);showToast('Ошибка: '+(e.message||'не удалось убрать'));return;}
+  showToast('Убрано из профиля');
+  await viewProfile(login);
+}
+
+async function showAvatarNotice(){
+  showModal(`<div class="modal-title">Аватарка заменена</div>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:16px">Аватарка на профиле была заменена.</p>
+    <button class="btn-orange w100" onclick="closeModal()">Понятно</button>`);
+  const cu=window._cu;
+  cu.avatarNotice=false;
+  await DB.updateUser(cu.login,{avatarNotice:false});
+}
+
+// серые оттенки для непокрашенных превью: каждому цвету палитры — свой серый по яркости
+function picGrays(pic){
+  if(pic._gray&&pic._gray.length===pic.palette.length)return pic._gray;
+  const lum=pic.palette.map(h=>{const c=hexToRgb(/^#[0-9a-fA-F]{6}$/.test(h)?h:'#999999');return 0.299*c.r+0.587*c.g+0.114*c.b;});
+  const order=lum.map((_,i)=>i).sort((a,b)=>lum[a]-lum[b]);
+  const n=order.length,g=new Array(n);
+  order.forEach((idx,rank)=>{g[idx]=n<=1?110:Math.round(36+rank*(205-36)/(n-1));});
+  Object.defineProperty(pic,'_gray',{value:g,writable:true,configurable:true,enumerable:false});
+  return g;
 }
 
 async function adminDeleteUser(login){
@@ -2363,7 +2517,7 @@ function renderAdminView(ctx,v){
   ctx.lineWidth=1;ctx.strokeStyle='#3A3A3E';ctx.stroke(p);
 }
 
-function adminPaintAt(px,py,rad,v){
+function adminPaintAt(px,py,v){
   const as=_adminState,b=as._base;if(!b)return;
   const erase=as._tool==='erase';
   const sel=as._selectedColorIdx;
@@ -2383,7 +2537,7 @@ function createAdminView(){
   const as=_adminState;
   if(as._view){as._view.destroy();as._view=null;}
   as._view=new PixelView(document.getElementById('adm-canvas-wrap'),document.getElementById('adm-canvas'),{
-    paint:true,touchAlwaysPaints:true,
+    paint:true,touchAlwaysPaints:true,interpolate:true,
     hintEl:document.getElementById('adm-zoom-hint'),
     render:renderAdminView,
     paintAt:adminPaintAt
@@ -2395,6 +2549,163 @@ function destroyAdminView(){
   if(as._view){as._view.destroy();as._view=null;}
 }
 
+// ============================================================
+// РАСПОЗНАВАНИЕ ФОТО → КЛЕТКИ И ЦВЕТА
+// Lab-цвет, выбор самых непохожих цветов (с учётом площади), голосование по клетке
+// ============================================================
+function rgb2lab(r,g,b){
+  let R=r/255,G=g/255,B=b/255;
+  R=R>0.04045?Math.pow((R+0.055)/1.055,2.4):R/12.92;
+  G=G>0.04045?Math.pow((G+0.055)/1.055,2.4):G/12.92;
+  B=B>0.04045?Math.pow((B+0.055)/1.055,2.4):B/12.92;
+  const X=(R*0.4124564+G*0.3575761+B*0.1804375)/0.95047;
+  const Y=R*0.2126729+G*0.7151522+B*0.0721750;
+  const Z=(R*0.0193339+G*0.1191920+B*0.9503041)/1.08883;
+  const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
+  const fx=f(X),fy=f(Y),fz=f(Z);
+  return[116*fy-16,500*(fx-fy),200*(fy-fz)];
+}
+function hexToLab(h){const c=hexToRgb(h);return rgb2lab(c.r,c.g,c.b);}
+function rgbToHex([r,g,b]){
+  return'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+
+// 1) фото → рабочая картинка (в S раз подробнее сетки) → гистограмма цветов
+function analyzeImage(img,cols,rows){
+  const S=Math.max(1,Math.min(12,Math.floor(Math.sqrt(600000/(cols*rows)))));
+  const W=cols*S,H=rows*S;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const cx=cv.getContext('2d',{willReadFrequently:true});
+  cx.imageSmoothingEnabled=true;cx.imageSmoothingQuality='high';
+  cx.drawImage(img,0,0,W,H);
+  const data=cx.getImageData(0,0,W,H).data;
+  const keys=new Uint16Array(W*H);
+  const cnt=new Float64Array(32768),sr=new Float64Array(32768),sg=new Float64Array(32768),sb=new Float64Array(32768);
+  let total=0;
+  for(let i=0,p=0;i<data.length;i+=4,p++){
+    if(data[i+3]<128){keys[p]=65535;continue;}
+    const k=((data[i]>>3)<<10)|((data[i+1]>>3)<<5)|(data[i+2]>>3);
+    keys[p]=k;cnt[k]++;sr[k]+=data[i];sg[k]+=data[i+1];sb[k]+=data[i+2];total++;
+  }
+  const bins=[];
+  for(let k=0;k<32768;k++){
+    const n=cnt[k];if(!n)continue;
+    const r=sr[k]/n,g=sg[k]/n,b=sb[k]/n,lab=rgb2lab(r,g,b);
+    bins.push({k,n,r,g,b,L:lab[0],A:lab[1],B:lab[2]});
+  }
+  return{S,W,H,cols,rows,keys,bins,total};
+}
+
+// 2) выбор k новых цветов: каждый следующий — самый «непохожий» на уже выбранные,
+//    при этом большие по площади цвета важнее шума. Свои цвета M_fen — фиксированные.
+function pickColors(an,fixedHex,k){
+  const bins=an.bins,nb=bins.length;
+  const fixed=fixedHex.map(hexToLab);
+  const minD=new Float64Array(nb).fill(Infinity);
+  const upd=lab=>{for(let i=0;i<nb;i++){const b=bins[i];const d=Math.hypot(b.L-lab[0],b.A-lab[1],b.B-lab[2]);if(d<minD[i])minD[i]=d;}};
+  const meanE=()=>{let s=0;for(let i=0;i<nb;i++)s+=bins[i].n*minD[i];return s/(an.total||1);};
+  fixed.forEach(upd);
+  const E=[];
+  if(fixed.length)E.push(meanE());
+  else{
+    let L=0,A=0,B=0;
+    bins.forEach(b=>{L+=b.n*b.L;A+=b.n*b.A;B+=b.n*b.B;});
+    L/=an.total||1;A/=an.total||1;B/=an.total||1;
+    let s=0;bins.forEach(b=>{s+=b.n*Math.hypot(b.L-L,b.A-A,b.B-B);});
+    E.push(s/(an.total||1));
+  }
+  const seeds=[];let have=fixed.length;
+  for(let j=0;j<k;j++){
+    let best=-1,bs=0;
+    for(let i=0;i<nb;i++){
+      const sc=have?Math.sqrt(bins[i].n)*minD[i]:bins[i].n;
+      if(sc>bs){bs=sc;best=i;}
+    }
+    if(best<0)break;
+    const b=bins[best],lab=[b.L,b.A,b.B];
+    seeds.push({lab,rgb:[b.r,b.g,b.b]});have++;
+    upd(lab);E.push(meanE());
+  }
+  return{seeds,E,fixed};
+}
+
+// 3) сколько цветов рекомендовать: пока каждый новый цвет заметно улучшает картинку
+function recommendCount(E){
+  if(E.length<2)return 2;
+  const E0=E[0];let rec=2;
+  for(let k=1;k<E.length;k++){
+    if(E[k]<=2.5){rec=k;break;}
+    if(k>=2&&(E[k-1]-E[k])<0.03*E0){rec=k-1;break;}
+    rec=k;
+  }
+  return Math.max(2,Math.min(10,rec));
+}
+
+// 4) уточнение новых цветов (k-means в Lab), свои цвета не двигаются
+function refineColors(an,fixed,seeds){
+  const bins=an.bins,nb=bins.length,nf=fixed.length;
+  const cen=[...fixed.map(l=>l.slice()),...seeds.map(s=>s.lab.slice())];
+  let sums=null;
+  for(let it=0;it<5;it++){
+    sums=cen.map(()=>({n:0,L:0,A:0,B:0,r:0,g:0,b:0}));
+    for(let i=0;i<nb;i++){
+      const b=bins[i];let best=0,bd=Infinity;
+      for(let j=0;j<cen.length;j++){
+        const c=cen[j],d=(b.L-c[0])**2+(b.A-c[1])**2+(b.B-c[2])**2;
+        if(d<bd){bd=d;best=j;}
+      }
+      const s=sums[best];s.n+=b.n;s.L+=b.n*b.L;s.A+=b.n*b.A;s.B+=b.n*b.B;s.r+=b.n*b.r;s.g+=b.n*b.g;s.b+=b.n*b.b;
+    }
+    for(let j=nf;j<cen.length;j++){const s=sums[j];if(s.n>0)cen[j]=[s.L/s.n,s.A/s.n,s.B/s.n];}
+  }
+  return seeds.map((sd,i)=>{
+    const s=sums[nf+i];
+    return rgbToHex(s.n>0?[s.r/s.n,s.g/s.n,s.b/s.n]:sd.rgb);
+  });
+}
+
+// 5) каждая клетка = самый частый цвет среди её подпикселей (без «смешанных» цветов на границах)
+function quantizeCells(an,paletteHex){
+  const{S,W,cols,rows,keys,bins}=an;
+  const pal=paletteHex.map(hexToLab),np=pal.length;
+  const near=new Int16Array(32768).fill(-1);
+  for(const b of bins){
+    let best=0,bd=Infinity;
+    for(let j=0;j<np;j++){
+      const d=(b.L-pal[j][0])**2+(b.A-pal[j][1])**2+(b.B-pal[j][2])**2;
+      if(d<bd){bd=d;best=j;}
+    }
+    near[b.k]=best;
+  }
+  const votes=new Uint32Array(np),need=(S*S)/2,pixels=[];
+  for(let r=0;r<rows;r++){
+    const row=[];
+    for(let c=0;c<cols;c++){
+      votes.fill(0);let op=0;
+      for(let sy=0;sy<S;sy++){
+        const base=(r*S+sy)*W+c*S;
+        for(let sx=0;sx<S;sx++){const k=keys[base+sx];if(k===65535)continue;votes[near[k]]++;op++;}
+      }
+      if(op<need||op===0){row.push({colorIdx:-1});continue;}
+      let bi=0,bv=-1;
+      for(let j=0;j<np;j++)if(votes[j]>bv){bv=votes[j];bi=j;}
+      row.push({colorIdx:bi});
+    }
+    pixels.push(row);
+  }
+  return pixels;
+}
+
+// 6) выкинуть созданные (не свои) цвета, которым не досталось ни одной клетки
+function pruneColors(pixels,nFixed,palette){
+  const used=new Uint8Array(palette.length);
+  pixels.forEach(row=>row.forEach(p=>{if(p.colorIdx>=0)used[p.colorIdx]=1;}));
+  const map=[],np=[];
+  palette.forEach((h,i)=>{if(i<nFixed||used[i]){map[i]=np.length;np.push(h);}else map[i]=-1;});
+  pixels.forEach(row=>row.forEach(p=>{if(p.colorIdx>=0)p.colorIdx=map[p.colorIdx];}));
+  return np;
+}
+
 function uploadAdminImage(){document.getElementById('adm-file-input').click()}
 function processAdminImage(input){
   const file=input.files[0];if(!file)return;
@@ -2402,95 +2713,61 @@ function processAdminImage(input){
   reader.onload=e=>{
     const img=new Image();
     img.onload=()=>{
-      _adminState._pendingImg=img;
-      const existingCount=_adminState.palette.length;
+      const as=_adminState;
+      as._pendingImg=img;as._an=null;as._rec=null;
+      const existingCount=as.palette.length;
       showModal(`
         <div class="modal-title">Автоматические цвета</div>
         <p style="color:var(--text2);font-size:14px;margin-bottom:12px">Сколько цветов создать автоматически на основе фото?${existingCount?` Уже добавленные вами ${existingCount} цвет(а) тоже будут использованы.`:''}</p>
-        <div class="field"><label>Количество дополнительных цветов</label><input id="auto-color-count" type="number" value="6" min="1" max="32"></div>
+        <div class="field"><label>Количество дополнительных цветов</label>
+          <input id="auto-color-count" type="number" value="6" min="1" max="32">
+          <div id="auto-rec" style="font-size:12px;color:var(--text2);margin-top:6px">Считаю рекомендуемое число…</div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn-orange" style="flex:1" onclick="confirmAutoColors()">Создать</button>
           <button class="btn-ghost" style="flex:1" onclick="closeModal()">Отмена</button>
         </div>`);
       input.value='';
+      setTimeout(computeRecommended,40);
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-function confirmAutoColors(){
-  const as=_adminState;
-  const img=as._pendingImg;
-  if(!img)return;
-  const autoCount=Math.max(1,Math.min(32,parseInt(document.getElementById('auto-color-count').value)||6));
-  closeModal();
-
-  const off=document.createElement('canvas');
-  off.width=as.cols;off.height=as.rows;
-  const ctx=off.getContext('2d');
-  ctx.drawImage(img,0,0,as.cols,as.rows);
-  const data=ctx.getImageData(0,0,as.cols,as.rows).data;
-
-  // собираем непрозрачные пиксели
-  const samples=[];
-  for(let i=0;i<data.length;i+=4){
-    if(data[i+3]>=128)samples.push([data[i],data[i+1],data[i+2]]);
+function computeRecommended(){
+  const as=_adminState,img=as._pendingImg;if(!img)return;
+  if(!as._an)as._an=analyzeImage(img,as.cols,as.rows);
+  const r=pickColors(as._an,as.palette,16);
+  as._rec=recommendCount(r.E);
+  const el=document.getElementById('auto-rec');
+  if(el){
+    el.innerHTML='Рекомендуется: <b style="color:var(--orange);cursor:pointer" onclick="document.getElementById(\'auto-color-count\').value='+as._rec+'">'+as._rec+'</b>';
   }
-  const existingPalette=as.palette.map(hexToRgb).map(c=>[c.r,c.g,c.b]);
-  const generated=kMeansColors(samples,autoCount);
-  const fullPaletteRgb=[...existingPalette,...generated];
-  const fullPaletteHex=fullPaletteRgb.map(rgbToHex);
+}
 
-  as.palette=fullPaletteHex;
-  as.labels=fullPaletteHex.map((_,i)=>defaultLabel(i));
-
-  as.pixels=Array.from({length:as.rows},(_,r)=>Array.from({length:as.cols},(_,c)=>{
-    const i=(r*as.cols+c)*4;
-    const a=data[i+3];
-    if(a<128)return{colorIdx:-1};
-    const [rr,gg,bb]=[data[i],data[i+1],data[i+2]];
-    let best=-1,bestD=Infinity;
-    fullPaletteRgb.forEach(([pr,pg,pb],pi)=>{
-      const d=(rr-pr)**2+(gg-pg)**2+(bb-pb)**2;
-      if(d<bestD){bestD=d;best=pi;}
-    });
-    return{colorIdx:best};
-  }));
-
-  as._selectedColorIdx=as.palette.length?0:null;
-  as._pendingImg=null;
+function confirmAutoColors(){
+  const as=_adminState,img=as._pendingImg;
+  if(!img)return;
+  const k=Math.max(1,Math.min(32,parseInt(document.getElementById('auto-color-count').value)||6));
+  closeModal();
+  const an=as._an||analyzeImage(img,as.cols,as.rows);
+  const nFixed=as.palette.length;
+  const pk=pickColors(an,as.palette,k);
+  const newHex=refineColors(an,pk.fixed,pk.seeds);
+  let palette=[...as.palette,...newHex];
+  const pixels=quantizeCells(an,palette);
+  const labels=[...as.labels];
+  const pruned=pruneColors(pixels,nFixed,palette);
+  palette=pruned;
+  for(let i=labels.length;i<palette.length;i++)labels.push(defaultLabel(i));
+  as.palette=palette;as.labels=labels.slice(0,palette.length);
+  as.pixels=pixels;
+  as._selectedColorIdx=palette.length?0:null;
+  as._pendingImg=null;as._an=null;
   renderAdminPalette();
   renderAdminCanvas(false);
   showToast('Цвета созданы из фото!');
-}
-
-function rgbToHex([r,g,b]){
-  return'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
-}
-
-function kMeansColors(samples,k){
-  if(samples.length===0)return Array.from({length:k},()=>[200,200,200]);
-  if(samples.length<=k)return samples;
-  // случайные начальные центры из выборки
-  let centers=[];
-  const step=Math.floor(samples.length/k);
-  for(let i=0;i<k;i++)centers.push(samples[Math.min(i*step,samples.length-1)].slice());
-
-  for(let iter=0;iter<8;iter++){
-    const sums=centers.map(()=>[0,0,0,0]);
-    for(const [r,g,b] of samples){
-      let best=0,bestD=Infinity;
-      for(let i=0;i<centers.length;i++){
-        const [cr,cg,cb]=centers[i];
-        const d=(r-cr)**2+(g-cg)**2+(b-cb)**2;
-        if(d<bestD){bestD=d;best=i;}
-      }
-      sums[best][0]+=r;sums[best][1]+=g;sums[best][2]+=b;sums[best][3]++;
-    }
-    centers=centers.map((c,i)=>sums[i][3]>0?[sums[i][0]/sums[i][3],sums[i][1]/sums[i][3],sums[i][2]/sums[i][3]]:c);
-  }
-  return centers;
 }
 
 async function saveAdminDraft(){
