@@ -4,7 +4,7 @@ Here, everyone can color pixel-art pictures, earn coins, and use them to unlock 
 
 ## Features
 
-* My artworks are fully colored
+* Artworks are fully colored
 * Add other users as friends
 * Leaderboard (Top Players)
 * User profiles:
