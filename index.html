@@ -1894,13 +1894,15 @@ async function sendFriendRequest(toLogin){
   if(ok)showToast('Заявка отправлена!');else showToast('Заявка уже отправлена');
   closeModal();
   if(getActiveNav()==='search')doSearch();
+  else if(getActiveNav()==='profile'&&window._profileLogin===toLogin)await viewProfile(toLogin);
 }
 
 async function acceptFriend(login){
   const cu=await refreshCurrentUser();
   await DB.addFriendship(cu.login,login);
   await DB.removeFriendRequest(login,cu.login);
-  await renderFriends();
+  if(getActiveNav()==='profile'&&window._profileLogin===login)await viewProfile(login);
+  else await renderFriends();
 }
 
 async function rejectFriend(login){
@@ -1999,6 +2001,7 @@ async function removeFromTop(login){
 // PROFILE
 // ============================================================
 async function viewProfile(login){
+  window._profileLogin=login;
   const cu=window._cu;
   const u=login===cu.login?await refreshCurrentUser():((await DB.getUser(login))||cu);
   const isSelf=u.login===cu.login;
@@ -2011,11 +2014,20 @@ async function viewProfile(login){
   const container=document.getElementById('profile-content');
   container.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Загрузка...</div>';
 
-  const [allProgress,friends,pics]=await Promise.all([
+  const [allProgress,friends,pics,myFriends,sentReqs,inReqs]=await Promise.all([
     DB.getAllProgressForUser(u.login),
     DB.getFriends(u.login),
-    DB.getPictures()
+    DB.getPictures(),
+    isSelf?[]:DB.getFriends(cu.login),
+    isSelf?[]:getSentRequestsByMe(cu.login),
+    isSelf?[]:DB.getFriendRequests(cu.login)
   ]);
+  const rel=isSelf?'self':(myFriends.includes(u.login)?'friend':(inReqs.includes(u.login)?'incoming':(sentReqs.includes(u.login)?'sent':'none')));
+  const relStyle='display:block;text-align:center;padding:10px;margin-bottom:16px;font-size:13px';
+  const friendHtml=rel==='none'?`<button class="btn-orange w100" style="margin-bottom:16px" onclick="sendFriendRequest('${login}')">+ В друзья</button>`
+    :rel==='friend'?`<div class="badge badge-green" style="${relStyle}">✓ В друзьях</div>`
+    :rel==='sent'?`<div class="badge badge-orange" style="${relStyle}">Заявка отправлена</div>`
+    :rel==='incoming'?`<button class="btn-orange w100" style="margin-bottom:16px" onclick="acceptFriend('${login}')">Принять заявку</button>`:'';
   const completed=allProgress.filter(c=>c.full).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
 
   const avatarHtml=u.avatar
@@ -2040,7 +2052,7 @@ async function viewProfile(login){
       <div class="stat-box"><div class="stat-num">${completed.length}</div><div class="stat-label">Картин</div></div>
       <div class="stat-box"><div class="stat-num">${friends.length}</div><div class="stat-label">Друзей</div></div>
     </div>
-    ${!isSelf&&!isAdminViewing?`<button class="btn-orange w100" style="margin-bottom:16px" onclick="sendFriendRequest('${login}')">+ В друзья</button>`:''}
+    ${friendHtml}
     <div class="section-title">Закрашенные картины</div>
     <div class="completed-grid" id="completed-grid-${login}"></div>`;
 
